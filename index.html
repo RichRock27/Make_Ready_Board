@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Make Ready Board</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fa-solid fa-clipboard-check"></i>
+                <span>MakeReady</span>
+            </div>
+            
+            <nav>
+                <a href="#" class="nav-item active" data-view="dashboard">
+                    <i class="fa-solid fa-table-columns"></i> Dashboard
+                </a>
+                <a href="#" class="nav-item" data-view="reports">
+                    <i class="fa-solid fa-chart-pie"></i> Reports
+                </a>
+            </nav>
+
+            <div class="filter-section">
+                <h3>Filters</h3>
+                <div class="filter-group">
+                    <label>Territory</label>
+                    <select id="filter-territory">
+                        <option value="all">All Territories</option>
+                        <option value="Denver Central">Denver Central</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Rent Ready Status</label>
+                    <select id="filter-ready">
+                        <option value="all">All</option>
+                        <option value="Yes">Ready</option>
+                        <option value="No">Not Ready</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Inspection Status</label>
+                    <select id="filter-inspection">
+                        <option value="all">All</option>
+                        <option value="NONE">No Inspection</option>
+                        <option value="NEW">New</option>
+                        <option value="IN PROGRESS">In Progress</option>
+                        <option value="DONE">Done</option>
+                    </select>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header>
+                <h1>Make Ready Overview</h1>
+                <div class="last-updated">
+                    Last Updated: <span id="last-updated-date">Loading...</span>
+                </div>
+            </header>
+
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card" id="card-vacant">
+                    <div class="icon"><i class="fa-solid fa-house-chimney-crack"></i></div>
+                    <div class="info">
+                        <h3>Total Vacant</h3>
+                        <div class="value">--</div>
+                    </div>
+                </div>
+                <div class="stat-card warning" id="card-not-ready">
+                    <div class="icon"><i class="fa-solid fa-tools"></i></div>
+                    <div class="info">
+                        <h3>Not Rent Ready</h3>
+                        <div class="value">--</div>
+                    </div>
+                </div>
+                <div class="stat-card danger" id="card-no-inspection">
+                    <div class="icon"><i class="fa-solid fa-clipboard-question"></i></div>
+                    <div class="info">
+                        <h3>No Inspection</h3>
+                        <div class="value">--</div>
+                    </div>
+                </div>
+                <div class="stat-card success" id="card-avg-days">
+                    <div class="icon"><i class="fa-solid fa-hourglass-half"></i></div>
+                    <div class="info">
+                        <h3>Avg Days Vacant</h3>
+                        <div class="value">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table Section -->
+            <div class="content-panel">
+                <div class="panel-header">
+                    <h2>Unit Status</h2>
+                    <div class="actions">
+                        <input type="text" id="search-input" placeholder="Search units...">
+                        <button class="btn-export" onclick="exportData()"><i class="fa-solid fa-download"></i> Export</button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table id="main-table">
+                        <thead>
+                            <tr>
+                                <th data-sort="property">Property</th>
+                                <th data-sort="unit">Unit</th>
+                                <th data-sort="moveOut">Move Out Date</th>
+                                <th data-sort="daysVacant">Days Vacant</th>
+                                <th data-sort="inspection">Inspection</th>
+                                <th data-sort="ready">Rent Ready?</th>
+                                <th data-sort="posted">Posted?</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body">
+                            <!-- Rows injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="script.js"></script>
+</body>
+</html>
