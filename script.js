@@ -252,7 +252,7 @@ function renderDashboard() {
                 <span class="status-dot ${item.rentReady ? 'green' : 'red'}"></span>
                 ${item.rentReady ? 'Yes' : 'No'}
             </td>
-            <td>
+            <td style="${item.rentReady && (!item.postedWeb || !item.postedNet) ? 'background: rgba(239, 68, 68, 0.15); border: 1px solid var(--danger); border-radius: 4px;' : ''}">
                 <div style="display:flex; gap:4px; font-size: 10px;">
                     <span class="badge ${item.postedWeb ? 'badge-new' : 'badge-none'}">WEB</span>
                     <span class="badge ${item.postedNet ? 'badge-new' : 'badge-none'}">NET</span>
