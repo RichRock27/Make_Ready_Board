@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,6 +11,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
+
 <body>
     <div class="app-container">
         <!-- Sidebar -->
@@ -18,7 +20,7 @@
                 <i class="fa-solid fa-clipboard-check"></i>
                 <span>MakeReady</span>
             </div>
-            
+
             <nav>
                 <a href="#" class="nav-item active" data-view="dashboard">
                     <i class="fa-solid fa-table-columns"></i> Dashboard
@@ -31,10 +33,9 @@
             <div class="filter-section">
                 <h3>Filters</h3>
                 <div class="filter-group">
-                    <label>Territory</label>
-                    <select id="filter-territory">
-                        <option value="all">All Territories</option>
-                        <option value="Denver Central">Denver Central</option>
+                    <label>Property</label>
+                    <select id="filter-property">
+                        <option value="all">All Properties</option>
                     </select>
                 </div>
                 <div class="filter-group">
@@ -105,7 +106,8 @@
                     <h2>Unit Status</h2>
                     <div class="actions">
                         <input type="text" id="search-input" placeholder="Search units...">
-                        <button class="btn-export" onclick="exportData()"><i class="fa-solid fa-download"></i> Export</button>
+                        <button class="btn-export" onclick="exportData()"><i class="fa-solid fa-download"></i>
+                            Export</button>
                     </div>
                 </div>
                 <div class="table-container">
@@ -134,4 +136,5 @@
     <!-- Scripts -->
     <script src="script.js"></script>
 </body>
+
 </html>

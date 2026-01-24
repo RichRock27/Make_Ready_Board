@@ -32,7 +32,7 @@ function setupEventListeners() {
     });
 
     // Filters
-    document.getElementById('filter-territory').addEventListener('change', renderDashboard);
+    document.getElementById('filter-property').addEventListener('change', renderDashboard);
     document.getElementById('filter-ready').addEventListener('change', renderDashboard);
     document.getElementById('filter-inspection').addEventListener('change', renderDashboard);
     document.getElementById('search-input').addEventListener('input', renderDashboard);
@@ -183,6 +183,29 @@ function processData() {
     appData.masterList.sort((a, b) => b.daysVacant - a.daysVacant);
 
     document.getElementById('last-updated-date').innerText = new Date().toLocaleString();
+
+    populatePropertyFilter();
+}
+
+function populatePropertyFilter() {
+    const select = document.getElementById('filter-property');
+    // Keep 'All Properties' option
+    const currentVal = select.value;
+    select.innerHTML = '<option value="all">All Properties</option>';
+
+    const properties = [...new Set(appData.masterList.map(i => i.property))].sort();
+
+    properties.forEach(prop => {
+        const option = document.createElement('option');
+        option.value = prop;
+        option.textContent = prop;
+        select.appendChild(option);
+    });
+
+    // Restore selection if possible, else default to all
+    if (properties.includes(currentVal)) {
+        select.value = currentVal;
+    }
 }
 
 function renderDashboard() {
@@ -204,13 +227,13 @@ function renderDashboard() {
     tableBody.innerHTML = '';
 
     // Filters
-    const terrFilter = document.getElementById('filter-territory').value;
+    const propFilter = document.getElementById('filter-property').value;
     const readyFilter = document.getElementById('filter-ready').value;
     const inspFilter = document.getElementById('filter-inspection').value;
     const search = document.getElementById('search-input').value.toLowerCase();
 
     const filtered = appData.masterList.filter(item => {
-        if (terrFilter !== 'all') { /* implement territory logic if data available */ }
+        if (propFilter !== 'all' && item.property !== propFilter) return false;
 
         if (readyFilter === 'Yes' && !item.rentReady) return false;
         if (readyFilter === 'No' && item.rentReady) return false;
