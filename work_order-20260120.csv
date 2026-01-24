@@ -1,0 +1,15 @@
+Property,Priority,Work Order Type,Home Warranty Expiration,Work Order Number,Job Description,Instructions,Status,Vendor,Unit,Primary Resident,Created At,Estimate Req On,Estimated On,Estimate Amount,Estimate Approval Status,Estimate Approved On,Estimate Approval Last Requested On,Scheduled Start,Scheduled End,Work Done On,Completed On,Amount,Invoice,Unit Turn ID,Recurring,Work Order Issue,Property Name,Property ID,Property Address,Property Street Address 1,Property Street Address 2,Property City,Property State,Property Zip,Unit Address,Unit Street Address 1,Unit Street Address 2,Unit City,Unit State,Unit Zip,Service Request Number,Service Request Description,Vendor ID,Unit ID,Occupancy ID
+
+"-> TEST - Casa de Verde - 11821 E Kentucky Ave Aurora, CO 80011","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","",""
+"TEST - Casa de Verde - 11821 E Kentucky Ave Aurora, CO 80011",Normal,Unit Turn,,21343-1,"Inspection Areas:
+Kitchen - Windows
+
+
+
+Kitchen - Flooring
+
+
+
+Kitchen - Walls/Ceiling",,Estimate Requested,,02,,01/19/2026,01/19/2026,,,Pending,,,,,,,0.00,,1076,No,,TEST - Casa de Verde,2217,"11821 E Kentucky Ave Aurora, CO 80011",11821 E Kentucky Ave,,Aurora,CO,80011,"2149 S Holly Unit 02 Aurora, CO 80011",2149 S Holly,Unit 02,Aurora,CO,80011,21343,Unit Turn Work Orders,,2373,
+
+Total,,,,,,,,,,,,,,0.00,,,,,,,,0.00,,,,,,,,,,,,,,,,,,,,,,,

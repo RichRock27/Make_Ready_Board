@@ -3,6 +3,8 @@ let appData = {
     moveOuts: [],
     vacancies: [],
     inspections: [],
+    workOrders: [],
+    ticklers: [],
     masterList: []
 };
 
@@ -10,7 +12,9 @@ let appData = {
 const FILES = {
     moveOut: 'Move Out.csv',
     vacancy: 'Unit Vacancy.csv',
-    inspection: 'Inspection Detail.csv'
+    inspection: 'Inspection Detail.csv',
+    workOrder: 'work_order-20260120.csv',
+    tickler: 'tenant_tickler-20260120.csv'
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -58,21 +62,27 @@ function switchView(viewName) {
 
 async function loadData() {
     try {
-        const [moveOutData, vacancyData, inspectionData] = await Promise.all([
+        // Load all available CSVs. 
+        // Note: In a real app we'd handle missing files more gracefully.
+        const [moveOuts, vacancies, inspections, workOrders, ticklers] = await Promise.all([
             fetchCSV(FILES.moveOut),
             fetchCSV(FILES.vacancy),
-            fetchCSV(FILES.inspection)
+            fetchCSV(FILES.inspection),
+            fetchCSV(FILES.workOrder).catch(() => []), // Optional
+            fetchCSV(FILES.tickler).catch(() => [])    // Optional
         ]);
 
-        appData.moveOuts = moveOutData;
-        appData.vacancies = vacancyData;
-        appData.inspections = inspectionData;
+        appData.moveOuts = moveOuts;
+        appData.vacancies = vacancies;
+        appData.inspections = inspections;
+        appData.workOrders = workOrders;
+        appData.ticklers = ticklers;
 
         processData();
         renderDashboard();
     } catch (error) {
         console.error("Error loading data:", error);
-        alert("Failed to load CSV data. Ensure 'Move Out.csv', 'Unit Vacancy.csv', and 'Inspection Detail.csv' are in the folder.");
+        alert("Failed to load critical CSV data.");
     }
 }
 
@@ -90,135 +100,144 @@ function fetchCSV(filename) {
 
 function normalizeUnit(unit) {
     if (!unit) return "Unknown";
-    // Basic normalization: trim whitespace. 
-    // If we find mismatched zeros (5 vs 05) we might need parseInt logic here.
     return unit.toString().trim();
 }
 
 function processData() {
     const merged = new Map();
+    // Helper to generate unique key
     const getKey = (prop, unit) => `${prop}-${normalizeUnit(unit)}`;
 
-    // 1. Base: Vacancies
+    // 1. BASE: Unit Vacancy (The Truth)
     appData.vacancies.forEach(row => {
         if (!row['Property Name'] || row['Property Name'] === 'Total') return;
-
         const key = getKey(row['Property Name'], row['Unit']);
+
         merged.set(key, {
+            // IDs
+            key: key,
             property: row['Property Name'],
             unit: normalizeUnit(row['Unit']),
-            moveOutDate: null,
+
+            // Vacancy Info
             daysVacant: parseInt(row['Days Vacant']) || 0,
             rentReady: row['Rent Ready'] === 'Yes',
+            rentReadyDate: row['Ready For Showing On'] || '',
+            availableOn: row['Available On'] || '',
             nextMoveIn: row['Next Move In'],
             postedWeb: row['Posted To Website'] === 'Yes',
             postedNet: row['Posted To Internet'] === 'Yes',
+
+            // Move Out Info (Default to null, fill later)
+            moveOutDate: null,
+            tenantName: '',
+
+            // Process (Fill later)
             inspectionStatus: 'NONE',
-            inspectionName: '',
-            inspectionDate: null
+            inspectionDate: null,
+            workOrderStatus: 'NONE',
+            workOrderEstAmount: null,
+            workOrderEstStatus: null
         });
     });
 
-    // 2. Merge Move Outs
+    // 2. ENRICH: Move Out Data (From Move Out.csv OR Tenant Tickler)
+    // Using simplistic 'Move Out.csv' for now as primary, falling back to Tickler
     appData.moveOuts.forEach(row => {
-        if (!row['Property Name'] || row['Property Name'] === 'Total') return;
+        if (!row['Property Name']) return;
         const key = getKey(row['Property Name'], row['Unit']);
 
+        // If unit not in vacancy list, we might still want it if it's a recent move out
         if (!merged.has(key)) {
-            // Unit is in Move Out list but NOT in Vacancy list. 
-            // It might be rented already? Or data drift.
-            // We add it to track "Recent Move Outs" even if not currently vacant.
             merged.set(key, {
+                key: key,
                 property: row['Property Name'],
                 unit: normalizeUnit(row['Unit']),
-                moveOutDate: row['Move Out Date'],
                 daysVacant: 0,
                 rentReady: false,
-                nextMoveIn: null,
                 postedWeb: false,
                 postedNet: false,
-                inspectionStatus: 'NONE',
-                inspectionName: '',
-                inspectionDate: null
+                moveOutDate: row['Move Out Date'],
+                inspectionStatus: 'NONE'
             });
-        } else {
-            merged.get(key).moveOutDate = row['Move Out Date'];
         }
+
+        const item = merged.get(key);
+        if (!item.moveOutDate) item.moveOutDate = row['Move Out Date'];
     });
 
-    // 3. Merge Inspections
-    // We want to prioritize "Move Out" inspections if multiple exist.
+    // 3. ENRICH: Inspections
     appData.inspections.forEach(row => {
         if (!row['Property Name']) return;
         const key = getKey(row['Property Name'], row['Unit']);
 
         if (merged.has(key)) {
             const item = merged.get(key);
-            const newName = (row['Inspection Name'] || '').toLowerCase();
-            const newStatus = (row['Status'] || 'NEW').toUpperCase();
+            const status = (row['Status'] || 'NEW').toUpperCase();
 
-            // Logic: 
-            // 1. If current stored is NONE, take this one.
-            // 2. If current is NOT Move Out related, but this one IS, take this one.
-            // 3. If both are Move Out related, take the most recent date? (Not implemented, taking latest in file)
-
-            const isMoveOut = newName.includes('move') || newName.includes('out');
-            const currentIsMoveOut = (item.inspectionName || '').toLowerCase().includes('move');
-
-            let shouldUpdate = false;
-            if (item.inspectionStatus === 'NONE') shouldUpdate = true;
-            else if (!currentIsMoveOut && isMoveOut) shouldUpdate = true;
-            else if (newStatus !== 'DONE' && item.inspectionStatus === 'DONE') shouldUpdate = true; // Prioritize active work?
-            else if (isMoveOut && currentIsMoveOut) shouldUpdate = true; // Overwrite with latest in list (assuming csv is recent-last or random)
-
-            if (shouldUpdate) {
-                item.inspectionStatus = newStatus || 'NEW';
-                item.inspectionName = row['Inspection Name'];
+            // Logic: Prioritize Active > Done > None. Prioritize "Move Out" inspection types.
+            if (item.inspectionStatus === 'NONE') {
+                item.inspectionStatus = status;
                 item.inspectionDate = row['Inspection Date'];
             }
         }
     });
 
+    // 4. ENRICH: Work Orders (New!)
+    appData.workOrders.forEach(row => {
+        // Note: Work Order CSV headers might need mapping depending on exact file format
+        // Usually: Property, Unit, Status, Estimate Amount
+        const prop = row['Property Name'] || row['Property'];
+        const unit = normalizeUnit(row['Unit']);
+        const key = getKey(prop, unit);
+
+        if (merged.has(key)) {
+            const item = merged.get(key);
+            // Simple logic: If there is an open WO, flag it
+            const status = row['Status'];
+            if (status && status !== 'Closed' && status !== 'Cancelled') {
+                item.workOrderStatus = status;
+                item.workOrderEstAmount = row['Estimate Amount'];
+                item.workOrderEstStatus = row['Estimate Approval Status'];
+            }
+        }
+    });
+
     appData.masterList = Array.from(merged.values());
+
+    // Sort: Days Vacant Descending
     appData.masterList.sort((a, b) => b.daysVacant - a.daysVacant);
 
     document.getElementById('last-updated-date').innerText = new Date().toLocaleString();
-
     populatePropertyFilter();
 }
 
 function populatePropertyFilter() {
     const select = document.getElementById('filter-property');
-    // Keep 'All Properties' option
     const currentVal = select.value;
     select.innerHTML = '<option value="all">All Properties</option>';
-
     const properties = [...new Set(appData.masterList.map(i => i.property))].sort();
-
     properties.forEach(prop => {
         const option = document.createElement('option');
         option.value = prop;
         option.textContent = prop;
         select.appendChild(option);
     });
-
-    // Restore selection if possible, else default to all
-    if (properties.includes(currentVal)) {
-        select.value = currentVal;
-    }
+    if (properties.includes(currentVal)) select.value = currentVal;
 }
 
 function renderDashboard() {
     const tableBody = document.getElementById('table-body');
     const tableHeader = document.querySelector('#main-table thead tr');
 
-    // Reset Header (Reports view might change it)
+    // 1. Setup Columns (Enhanced)
     tableHeader.innerHTML = `
         <th>Property</th>
         <th>Unit</th>
         <th>Move Out</th>
         <th>Days Vacant</th>
         <th>Inspection</th>
+        <th>Work Order</th>
         <th>Rent Ready?</th>
         <th>Posted?</th>
         <th>Actions</th>
@@ -226,7 +245,7 @@ function renderDashboard() {
 
     tableBody.innerHTML = '';
 
-    // Filters
+    // 2. Filter Master List
     const propFilter = document.getElementById('filter-property').value;
     const readyFilter = document.getElementById('filter-ready').value;
     const inspFilter = document.getElementById('filter-inspection').value;
@@ -234,15 +253,9 @@ function renderDashboard() {
 
     const filtered = appData.masterList.filter(item => {
         if (propFilter !== 'all' && item.property !== propFilter) return false;
-
         if (readyFilter === 'Yes' && !item.rentReady) return false;
         if (readyFilter === 'No' && item.rentReady) return false;
-
-        if (inspFilter !== 'all') {
-            if (inspFilter === 'NONE' && item.inspectionStatus !== 'NONE') return false;
-            // Fuzzy match for status (e.g. users might have typo in CSV)
-            if (inspFilter !== 'NONE' && item.inspectionStatus !== inspFilter) return false;
-        }
+        if (inspFilter !== 'all' && item.inspectionStatus !== inspFilter) return false;
 
         if (search) {
             return (`${item.property} ${item.unit}`).toLowerCase().includes(search);
@@ -252,30 +265,42 @@ function renderDashboard() {
 
     updateStats(filtered);
 
+    // 3. Render Rows
     filtered.forEach(item => {
         const tr = document.createElement('tr');
 
-        let badge = 'badge-none';
-        if (item.inspectionStatus === 'NEW') badge = 'badge-new';
-        else if (item.inspectionStatus === 'IN PROGRESS') badge = 'badge-progress';
-        else if (item.inspectionStatus === 'DONE') badge = 'badge-done';
+        // Inspection Badge Color
+        let inspBadge = 'badge-none';
+        if (item.inspectionStatus === 'NEW') inspBadge = 'badge-new';
+        else if (item.inspectionStatus === 'IN PROGRESS') inspBadge = 'badge-progress';
+        else if (item.inspectionStatus === 'DONE') inspBadge = 'badge-done';
+
+        // Work Order Info (If any)
+        let woDisplay = '<span class="badge badge-none">None</span>';
+        if (item.workOrderStatus && item.workOrderStatus !== 'NONE') {
+            woDisplay = `<div style="display:flex; flex-direction:column; gap:2px;">
+                            <span class="badge badge-progress">${item.workOrderStatus}</span>
+                            ${item.workOrderEstAmount ? `<span style="font-size:10px;">Est: ${item.workOrderEstAmount}</span>` : ''}
+                         </div>`;
+        }
+
+        // Alert Stylng for Posted Check
+        const alertStyle = (item.rentReady && (!item.postedWeb || !item.postedNet))
+            ? 'background: rgba(239, 68, 68, 0.15); border: 1px solid var(--danger); border-radius: 4px;'
+            : '';
 
         tr.innerHTML = `
             <td><strong>${item.property}</strong></td>
             <td>${item.unit}</td>
             <td>${item.moveOutDate || '-'}</td>
             <td>${item.daysVacant}</td>
-            <td>
-                <div style="display:flex; flex-direction:column; gap:2px;">
-                    <span class="badge ${badge}">${item.inspectionStatus}</span>
-                    <span style="font-size:10px; color:#64748b">${item.inspectionName || ''}</span>
-                </div>
-            </td>
+            <td><span class="badge ${inspBadge}">${item.inspectionStatus}</span></td>
+            <td>${woDisplay}</td>
             <td>
                 <span class="status-dot ${item.rentReady ? 'green' : 'red'}"></span>
                 ${item.rentReady ? 'Yes' : 'No'}
             </td>
-            <td style="${item.rentReady && (!item.postedWeb || !item.postedNet) ? 'background: rgba(239, 68, 68, 0.15); border: 1px solid var(--danger); border-radius: 4px;' : ''}">
+            <td style="${alertStyle}">
                 <div style="display:flex; gap:4px; font-size: 10px;">
                     <span class="badge ${item.postedWeb ? 'badge-new' : 'badge-none'}">WEB</span>
                     <span class="badge ${item.postedNet ? 'badge-new' : 'badge-none'}">NET</span>
@@ -291,9 +316,8 @@ function renderReports() {
     const tableBody = document.getElementById('table-body');
     const tableHeader = document.querySelector('#main-table thead tr');
 
-    // Custom Reports Header
     tableHeader.innerHTML = `
-        <th>Report Type</th>
+        <th>Report Name</th>
         <th>Count</th>
         <th>Description</th>
         <th>Action</th>
@@ -301,26 +325,37 @@ function renderReports() {
 
     tableBody.innerHTML = '';
 
+    // --- DEFINED REPORTS FROM MOVE OUT BOARD ---
     const reports = [
         {
-            title: 'Units Not Rent Ready',
-            filter: i => !i.rentReady,
-            desc: 'Vacant units that are not marked as Rent Ready yet.'
+            title: 'Active Move-Outs',
+            filter: i => !i.rentReady && i.daysVacant > 0, // Broad definition
+            desc: 'Total units in the turnover process (Vacant and not yet Ready).'
         },
         {
-            title: 'No Inspection Scheduled',
-            filter: i => i.inspectionStatus === 'NONE' || !i.inspectionStatus,
-            desc: 'Units with move-outs but no inspection record found.'
+            title: 'Pending Inspections',
+            filter: i => i.inspectionStatus === 'NEW' || i.inspectionStatus === 'IN PROGRESS',
+            desc: 'Units waiting for inspection to be completed.'
         },
         {
-            title: 'Inspections In Progress',
-            filter: i => i.inspectionStatus === 'IN PROGRESS',
-            desc: 'Units currently being inspected or turned.'
+            title: 'Awaiting Rent Ready',
+            filter: i => !i.rentReady && (i.inspectionStatus === 'DONE'),
+            desc: 'Inspection done, but unit is not marked Rent Ready (needs Work Order?).'
+        },
+        {
+            title: 'Vacant & Ready',
+            filter: i => i.rentReady,
+            desc: 'Units fully ready to lease.'
+        },
+        {
+            title: 'Being Marketed',
+            filter: i => i.postedWeb || i.postedNet,
+            desc: 'Units currently visible on website or internet.'
         },
         {
             title: 'Long Vacancy (> 90 Days)',
             filter: i => i.daysVacant > 90,
-            desc: 'Units vacant for more than 3 months.'
+            desc: 'Units staling on the market.'
         }
     ];
 
@@ -332,7 +367,7 @@ function renderReports() {
             <td><span class="badge badge-new" style="font-size:14px">${count}</span></td>
             <td>${rep.desc}</td>
             <td>
-                <button onclick="loadReportDetail('${rep.title}')" style="color:var(--accent); background:none; border:1px solid var(--accent); padding:6px 12px; border-radius:4px; cursor:pointer;">
+                <button style="color:var(--accent); background:none; border:1px solid var(--accent); padding:6px 12px; border-radius:4px; cursor:pointer;" onclick="alert('Filtering feature coming soon!')">
                     View List
                 </button>
             </td>
@@ -341,29 +376,18 @@ function renderReports() {
     });
 }
 
-// Global for inline onclick
-window.loadReportDetail = function (reportTitle) {
-    alert("In a full app, this would filter the main dashboard view to show: " + reportTitle);
-    // Switch to dashboard and apply filters mock
-    document.querySelector('.nav-item[data-view="dashboard"]').click();
-    // Simulate setting filters (implementation would require more complex state management)
-};
-
 function updateStats(data) {
     const totalVacant = data.length;
     const notReady = data.filter(i => !i.rentReady).length;
     const noInspection = data.filter(i => i.inspectionStatus === 'NONE').length;
 
-    // Avg Days
-    const totalDays = data.reduce((sum, i) => sum + i.daysVacant, 0);
-    const avgDays = totalVacant ? Math.round(totalDays / totalVacant) : 0;
+    // Avg Days Calculation (Robus)
+    const validDayCounts = data.map(i => i.daysVacant).filter(d => !isNaN(d) && d > 0);
+    const totalDays = validDayCounts.reduce((a, b) => a + b, 0);
+    const avgDays = validDayCounts.length ? Math.round(totalDays / validDayCounts.length) : 0;
 
     document.querySelector('#card-vacant .value').innerText = totalVacant;
     document.querySelector('#card-not-ready .value').innerText = notReady;
     document.querySelector('#card-no-inspection .value').innerText = noInspection;
     document.querySelector('#card-avg-days .value').innerText = avgDays;
 }
-
-window.exportData = function () {
-    alert("Export functionality placeholder.");
-};
