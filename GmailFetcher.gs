@@ -1,10 +1,10 @@
 var GmailFetcher = {
   getLatestReportData: function() {
-    // Search for threads from the last 2 days to catch the latest batch of reports
-    // We expect multiple emails (Vacancy, Tickler, Work Orders, Inspections)
+    // UPDATED: Search for "MRB Daily Reports" within the last 2 days (48h)
+    // This buffer ensures we catch the latest batch even if it arrived yesterday.
     var query = 'subject:"MRB Daily Reports" has:attachment newer_than:2d';
     
-    // Fetch up to 20 threads to ensure we get all the split reports
+    // Fetch up to 20 threads to ensure we get all the split parts (Vacancy, WO, etc)
     var threads = GmailApp.search(query, 0, 20);
     
     // Diagnostic Log for Client Side
@@ -26,18 +26,19 @@ var GmailFetcher = {
        return result;
     }
 
-    // --- BATCHING LOGIC ---
-    // The reports arrive as separate emails around the same time.
-    // We want to group the "latest batch" and ignore older ones (e.g. from yesterday).
+    // --- BATCHING LOGIC (Past 24h Cycle) ---
+    // The reports arrive as separate emails (Split Reports). 
+    // We group them by finding the NEWEST email and grabbing everything 
+    // that arrived within a 4-hour window of that timestamp.
     
-    // 1. Establish the "Anchor" time from the very newest thread.
+    // 1. Establish the "Anchor" time from the very newest thread found.
     var newestDate = threads[0].getLastMessageDate();
     result.timestamp = newestDate.toLocaleString();
     debugLog.push("Newest Email Date: " + result.timestamp);
 
-    // 2. Define a time window (e.g., 4 hours). Only process emails that arrived 
-    //    within 4 hours of the newest email.
-    var TIME_WINDOW_MS = 4 * 60 * 60 * 1000; // 4 hours
+    // 2. Define a time window (4 hours) to group the set.
+    //    Anything outside this window is considered an "Old Batch" (e.g. yesterday's duplicate).
+    var TIME_WINDOW_MS = 4 * 60 * 60 * 1000; 
 
     // Iterate through all found threads
     for (var i = 0; i < threads.length; i++) {
@@ -47,7 +48,6 @@ var GmailFetcher = {
 
         // Skip if this email is part of an older batch
         if (diff > TIME_WINDOW_MS) {
-            debugLog.push("Skipping older thread [" + i + "] from " + threadDate.toLocaleString());
             continue; 
         }
 
@@ -55,80 +55,72 @@ var GmailFetcher = {
         var msgs = thread.getMessages();
         var msg = msgs[msgs.length - 1]; // Latest msg in thread
         var subject = msg.getSubject();
-        
-        debugLog.push("Processing Email: [" + subject + "]");
-        
         var attachments = msg.getAttachments();
-        debugLog.push("  -> Attachments: " + attachments.length);
+        
+        debugLog.push("Processing Email: " + subject + " (" + attachments.length + " att)");
 
         for (var j = 0; j < attachments.length; j++) {
             var att = attachments[j];
             var name = att.getName().toLowerCase();
-            debugLog.push("  -> File: " + name);
-
-            // --- CSV PARSING ROUTER ---
-            // We use concat because files might be split (e.g. Next 90 Days / Last 90 Days)
             
+            // --- ROBUST CSV PARSING (Server Side) ---
+            // We use Utilities.parseCsv to handle spaces in headers and quoted fields correctly.
+            var parsedData = [];
+
             if (name.indexOf('tenant_tickler') > -1) {
-                 var data = this.parseCSV(att.getDataAsString());
-                 result.moveOuts = result.moveOuts.concat(data);
-                 debugLog.push("     -> MATCH: Added " + data.length + " move out rows.");
+                 parsedData = this.parseCSV(att.getDataAsString());
+                 result.moveOuts = result.moveOuts.concat(parsedData);
             } 
             else if (name.indexOf('unit_vacancy') > -1) {
-                 var data = this.parseCSV(att.getDataAsString());
-                 result.vacancies = result.vacancies.concat(data);
-                 debugLog.push("     -> MATCH: Added " + data.length + " vacancy rows.");
+                 parsedData = this.parseCSV(att.getDataAsString());
+                 result.vacancies = result.vacancies.concat(parsedData);
             }
             else if (name.indexOf('inspection_detail') > -1) {
-                 var data = this.parseCSV(att.getDataAsString());
-                 result.inspections = result.inspections.concat(data);
-                 debugLog.push("     -> MATCH: Added " + data.length + " inspection rows.");
+                 parsedData = this.parseCSV(att.getDataAsString());
+                 result.inspections = result.inspections.concat(parsedData);
             }
             else if (name.indexOf('work_order') > -1) {
-                 var data = this.parseCSV(att.getDataAsString());
-                 result.workOrders = result.workOrders.concat(data);
-                 debugLog.push("     -> MATCH: Added " + data.length + " work order rows.");
-            } else {
-                 debugLog.push("     -> IGNORED: Filename keywords not matched.");
+                 parsedData = this.parseCSV(att.getDataAsString());
+                 result.workOrders = result.workOrders.concat(parsedData);
+            }
+            
+            if (parsedData.length > 0) {
+                 debugLog.push("  -> MATCH: " + name + " (" + parsedData.length + " rows)");
             }
         }
     }
-    
-    debugLog.push("Summary: Vacancies=" + result.vacancies.length + ", MoveOuts=" + result.moveOuts.length + ", Insp=" + result.inspections.length + ", WOs=" + result.workOrders.length);
     
     return result;
   },
 
+  // Helper: Use Google's native CSV parser for reliability
   parseCSV: function(csvString) {
     try {
-      var lines = csvString.split(/\r\n|\n/);
-      var headers = [];
+      var table = Utilities.parseCsv(csvString);
+      if (!table || table.length < 2) return []; // Need header + data
+
+      // Extract Headers (Row 0)
+      var headers = table[0].map(function(h) { return h.trim(); });
       var data = [];
-      for (var i = 0; i < lines.length; i++) {
-        var line = lines[i].trim();
-        if (!line) continue;
-        var row = this.splitCSVLine(line);
-        if (i === 0) {
-          headers = row.map(function(h) { return h.replace(/^"|"$/g, '').trim(); });
-        } else {
-          var obj = {};
-          // Map row to headers
-          for (var k = 0; k < headers.length; k++) {
-            if (row[k] !== undefined) {
-                 obj[headers[k]] = row[k].replace(/^"|"$/g, '').trim();
-            }
-          }
-          data.push(obj);
+
+      // Extract Data (Row 1+)
+      for (var i = 1; i < table.length; i++) {
+        var row = table[i];
+        if (row.length === 0 || (row.length === 1 && row[0] === '')) continue; // Skip empty rows
+        
+        var obj = {};
+        for (var k = 0; k < headers.length; k++) {
+           // Safely map if row has value
+           if (k < row.length) {
+              obj[headers[k]] = row[k].trim();
+           }
         }
+        data.push(obj);
       }
       return data;
     } catch (e) {
+      Logger.log("Error parsing CSV: " + e.toString());
       return [];
     }
-  },
-
-  splitCSVLine: function(str) {
-      var matches = str.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
-      return matches ? matches : str.split(',');
   }
 };
