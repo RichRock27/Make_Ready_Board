@@ -523,8 +523,16 @@
         function onDataSuccess(response) {
             document.getElementById('loading-overlay').style.display = 'none';
             if (response.status !== 'success') {
-                alert("Server completed with error: " + response.message);
+                alert("Server Error: " + response.message);
                 return;
+            }
+
+            // DIAGNOSTIC ULT
+            if (response.data.debug) {
+                console.log(response.data.debug.join('\\n'));
+                if (response.data.vacancies.length === 0) {
+                    alert("DEBUG INFO:\\n" + response.data.debug.join('\\n'));
+                }
             }
 
             processData(response.data);
