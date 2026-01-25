@@ -5,14 +5,341 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Make Ready Board</title>
-    <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --border: #334155;
+            --glass: rgba(30, 41, 59, 0.7);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            font-size: 14px;
+        }
+
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 260px;
+            background-color: var(--bg-card);
+            border-right: 1px solid var(--border);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.2s;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .nav-item:hover,
+        .nav-item.active {
+            background-color: rgba(59, 130, 246, 0.1);
+            color: var(--accent);
+        }
+
+        .filter-section h3 {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            letter-spacing: 0.05em;
+        }
+
+        .filter-group {
+            margin-bottom: 16px;
+        }
+
+        .filter-group label {
+            display: block;
+            font-size: 13px;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        select {
+            width: 100%;
+            padding: 8px 12px;
+            background-color: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            outline: none;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 32px;
+            margin-left: 260px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 32px;
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .last-updated {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background-color: var(--bg-card);
+            padding: 24px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card .icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .stat-card.warning .icon {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
+        }
+
+        .stat-card.danger .icon {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+        }
+
+        .stat-card.success .icon {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .stat-card .info h3 {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+
+        .stat-card .value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .content-panel {
+            background-color: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            padding: 24px;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .panel-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        #search-input {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            width: 250px;
+        }
+
+        .btn-export {
+            padding: 8px 16px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th {
+            text-align: left;
+            padding: 12px 16px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+        }
+
+        td {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-new {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent);
+        }
+
+        .badge-progress {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
+        }
+
+        .badge-done {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .badge-none {
+            background: rgba(148, 163, 184, 0.1);
+            color: var(--text-secondary);
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+
+        .status-dot.green {
+            background: var(--success);
+        }
+
+        .status-dot.red {
+            background: var(--danger);
+        }
+
+        #loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.9);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
 </head>
 
 <body>
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <div style="font-size:16px; color:white;">Checking Email for Reports...</div>
+    </div>
+
     <div class="app-container">
         <!-- Sidebar -->
         <aside class="sidebar">
@@ -22,12 +349,12 @@
             </div>
 
             <nav>
-                <a href="#" class="nav-item active" data-view="dashboard">
+                <div class="nav-item active" data-view="dashboard">
                     <i class="fa-solid fa-table-columns"></i> Dashboard
-                </a>
-                <a href="#" class="nav-item" data-view="reports">
+                </div>
+                <div class="nav-item" data-view="reports">
                     <i class="fa-solid fa-chart-pie"></i> Reports
-                </a>
+                </div>
             </nav>
 
             <div class="filter-section">
@@ -106,21 +433,22 @@
                     <h2>Unit Status</h2>
                     <div class="actions">
                         <input type="text" id="search-input" placeholder="Search units...">
-                        <button class="btn-export" onclick="exportData()"><i class="fa-solid fa-download"></i>
-                            Export</button>
+                        <button class="btn-export" onclick="loadData()"><i class="fa-solid fa-rotate"></i>
+                            Refresh</button>
                     </div>
                 </div>
                 <div class="table-container">
                     <table id="main-table">
                         <thead>
                             <tr>
-                                <th data-sort="property">Property</th>
-                                <th data-sort="unit">Unit</th>
-                                <th data-sort="moveOut">Move Out Date</th>
-                                <th data-sort="daysVacant">Days Vacant</th>
-                                <th data-sort="inspection">Inspection</th>
-                                <th data-sort="ready">Rent Ready?</th>
-                                <th data-sort="posted">Posted?</th>
+                                <th>Property</th>
+                                <th>Unit</th>
+                                <th>Move Out</th>
+                                <th>Days Vacant</th>
+                                <th>Inspection</th>
+                                <th>Work Order</th>
+                                <th>Rent Ready?</th>
+                                <th>Posted?</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -133,8 +461,285 @@
         </main>
     </div>
 
-    <!-- Scripts -->
-    <script src="script.js"></script>
+    <script>
+        // Data Storage
+        let appData = {
+            masterList: []
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+                    el.classList.add('active');
+                    switchView(el.dataset.view);
+                });
+            });
+
+            document.getElementById('filter-property').addEventListener('change', renderDashboard);
+            document.getElementById('filter-ready').addEventListener('change', renderDashboard);
+            document.getElementById('filter-inspection').addEventListener('change', renderDashboard);
+            document.getElementById('search-input').addEventListener('input', renderDashboard);
+        }
+
+        function switchView(viewName) {
+            const mainTitle = document.querySelector('header h1');
+            const contentPanel = document.querySelector('.content-panel');
+            const statsGrid = document.querySelector('.stats-grid');
+            if (viewName === 'dashboard') {
+                mainTitle.innerText = 'Make Ready Overview';
+                statsGrid.style.display = 'grid';
+                document.querySelector('.panel-header .actions').style.display = 'flex';
+                renderDashboard();
+            } else if (viewName === 'reports') {
+                mainTitle.innerText = 'Generated Reports';
+                statsGrid.style.display = 'none';
+                document.querySelector('.panel-header .actions').style.display = 'none';
+                renderReports();
+            }
+        }
+
+        function loadData() {
+            document.getElementById('loading-overlay').style.display = 'flex';
+
+            // CALL SERVER
+            google.script.run
+                .withSuccessHandler(onDataSuccess)
+                .withFailureHandler(onDataFail)
+                .getData();
+        }
+
+        function onDataFail(err) {
+            document.getElementById('loading-overlay').style.display = 'none';
+            alert("Error loading data from Gmail: " + err);
+        }
+
+        function onDataSuccess(response) {
+            document.getElementById('loading-overlay').style.display = 'none';
+            if (response.status !== 'success') {
+                alert("Server completed with error: " + response.message);
+                return;
+            }
+
+            processData(response.data);
+            renderDashboard();
+        }
+
+        function normalizeUnit(unit) {
+            if (!unit) return "Unknown";
+            return unit.toString().trim();
+        }
+
+        function processData(rawData) {
+            const merged = new Map();
+            const getKey = (prop, unit) => `${prop}-${normalizeUnit(unit)}`;
+
+            // 1. BASE: Vacancy
+            rawData.vacancies.forEach(row => {
+                if (!row['Property Name'] || row['Property Name'] === 'Total') return;
+                const key = getKey(row['Property Name'], row['Unit']);
+
+                merged.set(key, {
+                    key: key,
+                    property: row['Property Name'],
+                    unit: normalizeUnit(row['Unit']),
+                    daysVacant: parseInt(row['Days Vacant']) || 0,
+                    rentReady: row['Rent Ready'] === 'Yes',
+                    rentReadyDate: row['Ready For Showing On'] || '',
+                    postedWeb: row['Posted To Website'] === 'Yes',
+                    postedNet: row['Posted To Internet'] === 'Yes',
+
+                    moveOutDate: null,
+                    inspectionStatus: 'NONE',
+                    workOrderStatus: 'NONE',
+                    workOrderEstAmount: null
+                });
+            });
+
+            // 2. ENRICH: Move Out (Tickler)
+            rawData.moveOuts.forEach(row => {
+                // Use 'Property Name' or 'Property' depending on CSV format
+                let prop = row['Property Name'] || row['Property'];
+                if (!prop) return;
+
+                const key = getKey(prop, row['Unit']);
+
+                if (!merged.has(key)) {
+                    merged.set(key, {
+                        key: key,
+                        property: prop,
+                        unit: normalizeUnit(row['Unit']),
+                        daysVacant: 0,
+                        rentReady: false,
+                        postedWeb: false,
+                        postedNet: false,
+                        moveOutDate: row['Date'] || row['Move Out Date'], // Tickler uses 'Date'
+                        inspectionStatus: 'NONE'
+                    });
+                }
+
+                const item = merged.get(key);
+                if (!item.moveOutDate) item.moveOutDate = row['Date'] || row['Move Out Date'];
+            });
+
+            // 3. ENRICH: Inspections
+            rawData.inspections.forEach(row => {
+                let prop = row['Property Name'] || row['Property'];
+                if (!prop) return;
+                const key = getKey(prop, row['Unit']);
+
+                if (merged.has(key)) {
+                    const item = merged.get(key);
+                    const status = (row['Status'] || 'NEW').toUpperCase();
+                    if (item.inspectionStatus === 'NONE' || status !== 'DONE') {
+                        item.inspectionStatus = status;
+                    }
+                }
+            });
+
+            // 4. ENRICH: Work Orders
+            rawData.workOrders.forEach(row => {
+                let prop = row['Property Name'] || row['Property'];
+                if (!prop) return;
+                const key = getKey(prop, row['Unit']);
+
+                if (merged.has(key)) {
+                    const item = merged.get(key);
+                    const status = row['Status'];
+                    if (status && status !== 'Closed' && status !== 'Cancelled') {
+                        item.workOrderStatus = status;
+                        item.workOrderEstAmount = row['Estimate Amount'];
+                    }
+                }
+            });
+
+            appData.masterList = Array.from(merged.values());
+            appData.masterList.sort((a, b) => b.daysVacant - a.daysVacant);
+
+            document.getElementById('last-updated-date').innerText = rawData.timestamp || new Date().toLocaleString();
+            populatePropertyFilter();
+        }
+
+        function populatePropertyFilter() {
+            const select = document.getElementById('filter-property');
+            const currentVal = select.value;
+            select.innerHTML = '<option value="all">All Properties</option>';
+            const properties = [...new Set(appData.masterList.map(i => i.property))].sort();
+            properties.forEach(prop => {
+                const opt = document.createElement('option');
+                opt.value = opt.textContent = prop;
+                select.appendChild(opt);
+            });
+            if (properties.includes(currentVal)) select.value = currentVal;
+        }
+
+        function renderDashboard() {
+            const tableBody = document.getElementById('table-body');
+            const tableHeader = document.querySelector('#main-table thead tr');
+
+            tableHeader.innerHTML = `
+                <th>Property</th>
+                <th>Unit</th>
+                <th>Move Out</th>
+                <th>Days Vacant</th>
+                <th>Inspection</th>
+                <th>Work Order</th>
+                <th>Rent Ready?</th>
+                <th>Posted?</th>
+                <th>Actions</th>
+            `;
+            tableBody.innerHTML = '';
+
+            const propFilter = document.getElementById('filter-property').value;
+            const readyFilter = document.getElementById('filter-ready').value;
+            const inspFilter = document.getElementById('filter-inspection').value;
+            const search = document.getElementById('search-input').value.toLowerCase();
+
+            const filtered = appData.masterList.filter(item => {
+                if (propFilter !== 'all' && item.property !== propFilter) return false;
+                if (readyFilter === 'Yes' && !item.rentReady) return false;
+                if (readyFilter === 'No' && item.rentReady) return false;
+                if (inspFilter !== 'all' && item.inspectionStatus !== inspFilter) return false;
+                if (search) return (`${item.property} ${item.unit}`).toLowerCase().includes(search);
+                return true;
+            });
+
+            updateStats(filtered);
+
+            filtered.forEach(item => {
+                const tr = document.createElement('tr');
+                let inspBadge = 'badge-none';
+                if (item.inspectionStatus === 'NEW') inspBadge = 'badge-new';
+                else if (item.inspectionStatus === 'IN PROGRESS') inspBadge = 'badge-progress';
+                else if (item.inspectionStatus === 'DONE') inspBadge = 'badge-done';
+
+                let woDisplay = '<span class="badge badge-none">None</span>';
+                if (item.workOrderStatus && item.workOrderStatus !== 'NONE') {
+                    woDisplay = `<div style="display:flex; flex-direction:column; gap:2px;"><span class="badge badge-progress">${item.workOrderStatus}</span>${item.workOrderEstAmount ? `<span style="font-size:10px;">Est: ${item.workOrderEstAmount}</span>` : ''}</div>`;
+                }
+
+                const alertStyle = (item.rentReady && (!item.postedWeb || !item.postedNet))
+                    ? 'background: rgba(239, 68, 68, 0.15); border: 1px solid var(--danger); border-radius: 4px;' : '';
+
+                tr.innerHTML = `
+                    <td><strong>${item.property}</strong></td>
+                    <td>${item.unit}</td>
+                    <td>${item.moveOutDate || '-'}</td>
+                    <td>${item.daysVacant}</td>
+                    <td><span class="badge ${inspBadge}">${item.inspectionStatus}</span></td>
+                    <td>${woDisplay}</td>
+                    <td><span class="status-dot ${item.rentReady ? 'green' : 'red'}"></span>${item.rentReady ? 'Yes' : 'No'}</td>
+                    <td style="${alertStyle}">
+                        <div style="display:flex; gap:4px; font-size: 10px;">
+                            <span class="badge ${item.postedWeb ? 'badge-new' : 'badge-none'}">WEB</span>
+                            <span class="badge ${item.postedNet ? 'badge-new' : 'badge-none'}">NET</span>
+                        </div>
+                    </td>
+                    <td><button class="btn-action"><i class="fa-solid fa-ellipsis"></i></button></td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+
+        function renderReports() {
+            const tableBody = document.getElementById('table-body');
+            const tableHeader = document.querySelector('#main-table thead tr');
+            tableHeader.innerHTML = `<th>Report Name</th><th>Count</th><th>Description</th><th>Action</th>`;
+            tableBody.innerHTML = '';
+
+            const reports = [
+                { title: 'Active Move-Outs', filter: i => !i.rentReady && i.daysVacant > 0, desc: 'Turning units (Vacant, Not Ready).' },
+                { title: 'Pending Inspections', filter: i => i.inspectionStatus === 'NEW' || i.inspectionStatus === 'IN PROGRESS', desc: 'Awaiting inspection.' },
+                { title: 'Awaiting Rent Ready', filter: i => !i.rentReady && i.inspectionStatus === 'DONE', desc: 'Inspection done, waiting for repairs/cleaning.' },
+                { title: 'Vacant & Ready', filter: i => i.rentReady, desc: 'Units ready to lease.' },
+                { title: 'Being Marketed', filter: i => i.postedWeb || i.postedNet, desc: 'Posted online.' },
+                { title: 'Long Vacancy (> 90 Days)', filter: i => i.daysVacant > 90, desc: 'Stale units.' }
+            ];
+
+            reports.forEach(rep => {
+                const count = appData.masterList.filter(rep.filter).length;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td><strong>${rep.title}</strong></td><td><span class="badge badge-new" style="font-size:14px">${count}</span></td><td>${rep.desc}</td><td><button style="color:var(--accent); background:none; border:1px solid var(--accent); padding:6px 12px; border-radius:4px; cursor:pointer;">View List</button></td>`;
+                tableBody.appendChild(tr);
+            });
+        }
+
+        function updateStats(data) {
+            document.getElementById('card-vacant').querySelector('.value').innerText = data.length;
+            document.getElementById('card-not-ready').querySelector('.value').innerText = data.filter(i => !i.rentReady).length;
+            document.getElementById('card-no-inspection').querySelector('.value').innerText = data.filter(i => i.inspectionStatus === 'NONE').length;
+
+            const days = data.map(i => i.daysVacant).filter(d => d > 0);
+            const avg = days.length ? Math.round(days.reduce((a, b) => a + b, 0) / days.length) : 0;
+            document.getElementById('card-avg-days').querySelector('.value').innerText = avg;
+        }
+    </script>
 </body>
 
 </html>
