@@ -391,6 +391,10 @@
             <div class="logo"><i class="fa-solid fa-clipboard-check"></i><span>MakeReady</span></div>
             <div class="filter-section">
                 <h3>Core Filters</h3>
+                <div class="filter-group"><label>Territory</label><select id="filter-territory"
+                        aria-label="Filter Territory">
+                        <option value="all">All Territories</option>
+                    </select></div>
                 <div class="filter-group"><label>Property</label><select id="filter-property"
                         aria-label="Filter Property">
                         <option value="all">All Properties</option>
@@ -518,20 +522,30 @@
         });
 
         function setupFilters() {
-            const ids = ['filter-property', 'filter-ready', 'filter-inspection', 'filter-web', 'filter-net', 'search-input'];
+            const ids = ['filter-territory', 'filter-property', 'filter-ready', 'filter-inspection', 'filter-web', 'filter-net', 'search-input'];
             ids.forEach(id => {
                 const el = document.getElementById(id);
-                if (el) el.addEventListener('input', renderDashboard);
+                if (el) el.addEventListener('input', (e) => {
+                    // Special logic: If Territory changes, re-populate Property filter
+                    if (e.target.id === 'filter-territory') {
+                        populatePropertyFilter();
+                    }
+                    renderDashboard();
+                });
             });
         }
 
         function resetFilters() {
+            document.getElementById('filter-territory').value = 'all';
             document.getElementById('filter-property').value = 'all';
             document.getElementById('filter-ready').value = 'all';
             document.getElementById('filter-inspection').value = 'all';
             document.getElementById('filter-web').value = 'all';
             document.getElementById('filter-net').value = 'all';
             document.getElementById('search-input').value = '';
+
+            // Re-populate property based on reset territory
+            populatePropertyFilter();
             renderDashboard();
         }
 
@@ -559,7 +573,7 @@
                     onDataSuccess({
                         status: 'success',
                         data: {
-                            vacancies: [{ "Property": "Test Prop", "Unit": "101", "Days Vacant": 5, "Rent Ready": "No" }],
+                            vacancies: [{ "Property": "Test Prop", "Unit": "101", "Days Vacant": 5, "Rent Ready": "No", "Territory": "North" }],
                             moveOuts: [], inspections: [], workOrders: [], timestamp: "Local Test"
                         }
                     });
@@ -616,7 +630,10 @@
                     if (!prop || prop === 'Total') return;
                     const key = getKey(prop, row['Unit']);
                     merged.set(key, {
-                        key: key, property: prop, unit: normalizeUnit(row['Unit']),
+                        key: key,
+                        property: prop,
+                        territory: row['Territory'] || 'Unknown', // Parse Territory
+                        unit: normalizeUnit(row['Unit']),
                         daysVacant: safeInt(row['Days Vacant']),
                         rentReady: (row['Rent Ready'] === 'Yes'),
                         postedWeb: (row['Posted To Website'] === 'Yes'),
@@ -671,20 +688,53 @@
             appData.masterList.sort((a, b) => b.daysVacant - a.daysVacant);
             const dateSpan = document.getElementById('last-updated-date');
             if (dateSpan) dateSpan.innerText = rawData.timestamp || new Date().toLocaleString();
+
+            populateTerritoryFilter();
             populatePropertyFilter();
+        }
+
+        function populateTerritoryFilter() {
+            const select = document.getElementById('filter-territory');
+            if (!select) return;
+            const current = select.value;
+            const territories = [...new Set(appData.masterList.map(i => i.territory).filter(t => t && t !== 'Unknown'))].sort();
+
+            select.innerHTML = '<option value="all">All Territories</option>';
+            territories.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t; opt.innerText = t; select.appendChild(opt);
+            });
+            // Try to restore selection if possible
+            if (territories.includes(current)) select.value = current;
         }
 
         function populatePropertyFilter() {
             const select = document.getElementById('filter-property');
             if (!select) return;
+
+            const territoryFilter = document.getElementById('filter-territory').value;
             const current = select.value;
-            const props = [...new Set(appData.masterList.map(i => i.property))].sort();
+
+            // Filter properties based on selected Territory
+            let availableItems = appData.masterList;
+            if (territoryFilter !== 'all') {
+                availableItems = availableItems.filter(i => i.territory === territoryFilter);
+            }
+
+            const props = [...new Set(availableItems.map(i => i.property))].sort();
+
             select.innerHTML = '<option value="all">All Properties</option>';
             props.forEach(p => {
                 const opt = document.createElement('option');
                 opt.value = p; opt.innerText = p; select.appendChild(opt);
             });
-            select.value = current;
+
+            // Reset to 'all' if the previously selected property is no longer valid for the new territory
+            if (props.includes(current)) {
+                select.value = current;
+            } else {
+                select.value = 'all';
+            }
         }
 
         function renderDashboard() {
@@ -693,6 +743,7 @@
             tableBody.innerHTML = '';
 
             const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : 'all'; };
+            const fTerritory = getVal('filter-territory');
             const fProp = getVal('filter-property');
             const fReady = getVal('filter-ready');
             const fInsp = getVal('filter-inspection');
@@ -702,6 +753,7 @@
             const fSearch = searchEl ? searchEl.value.toLowerCase() : '';
 
             const filtered = appData.masterList.filter(item => {
+                if (fTerritory !== 'all' && item.territory !== fTerritory) return false; // New Territory Check
                 if (fProp !== 'all' && item.property !== fProp) return false;
                 if (fReady === 'Yes' && !item.rentReady) return false;
                 if (fReady === 'No' && item.rentReady) return false;
