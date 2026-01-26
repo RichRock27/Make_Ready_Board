@@ -802,6 +802,9 @@
         // ... (populateTerritoryFilter/populatePropertyFilter stay same) ...
 
         function renderDashboard() {
+            if (!appData.masterList) appData.masterList = [];
+            logToScreen(`Rendering Dashboard with ${appData.masterList.length} total items.`);
+
             const tableBody = document.getElementById('table-body');
             if (!tableBody) return;
             tableBody.innerHTML = '';
