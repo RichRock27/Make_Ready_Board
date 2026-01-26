@@ -537,6 +537,12 @@
 
         // ... (loadData/onDataSuccess stay same) ...
         function loadData() {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) {
+                overlay.classList.add('active');
+                overlay.style.display = 'flex';
+            }
+
             const icon = document.getElementById('refresh-icon');
             if (icon) icon.classList.add('fa-spin');
 
@@ -557,18 +563,45 @@
         }
 
         function onDataFail(err) {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) {
+                overlay.classList.remove('active');
+                overlay.style.display = 'none';
+            }
+
             const icon = document.getElementById('refresh-icon');
             if (icon) icon.classList.remove('fa-spin');
             alert("Error: " + err);
         }
 
         function onDataSuccess(response) {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) {
+                overlay.classList.remove('active');
+                overlay.style.display = 'none';
+            }
+
             const icon = document.getElementById('refresh-icon');
             if (icon) icon.classList.remove('fa-spin');
+
             if (!response || response.status !== 'success') {
                 alert("Server Error: " + (response ? response.message : "Unknown"));
                 return;
             }
+
+            const data = response.data;
+            // Check if we actually got data
+            const totalItems = (data.moveOuts?.length || 0) + (data.vacancies?.length || 0);
+            if (totalItems === 0) {
+                console.warn("No data returned from server.");
+                let msg = "No relevant data found in the last 5 days of emails.";
+                if (data.debug) {
+                    console.log("Server Debug:", data.debug);
+                    msg += "\n\nDebug info logged to console.";
+                }
+                alert(msg);
+            }
+
             processData(response.data);
             renderDashboard();
         }

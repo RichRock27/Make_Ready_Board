@@ -1,6 +1,6 @@
 var GmailFetcher = {
   getLatestReportData: function() {
-    var query = 'subject:MRB has:attachment newer_than:2d';
+    var query = 'subject:(MRB OR "Move Out" OR "Daily Report") has:attachment newer_than:5d';
     var threads = GmailApp.search(query, 0, 20);
     
     var debugLog = [];

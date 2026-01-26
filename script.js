@@ -8,15 +8,6 @@ let appData = {
     masterList: []
 };
 
-// File Paths
-const FILES = {
-    moveOut: 'Move Out.csv',
-    vacancy: 'Unit Vacancy.csv',
-    inspection: 'Inspection Detail.csv',
-    workOrder: 'work_order-20260120.csv',
-    tickler: 'tenant_tickler-20260120.csv'
-};
-
 document.addEventListener('DOMContentLoaded', () => {
     loadData();
     setupEventListeners();
@@ -60,42 +51,55 @@ function switchView(viewName) {
     }
 }
 
-async function loadData() {
-    try {
-        // Load all available CSVs. 
-        // Note: In a real app we'd handle missing files more gracefully.
-        const [moveOuts, vacancies, inspections, workOrders, ticklers] = await Promise.all([
-            fetchCSV(FILES.moveOut),
-            fetchCSV(FILES.vacancy),
-            fetchCSV(FILES.inspection),
-            fetchCSV(FILES.workOrder).catch(() => []), // Optional
-            fetchCSV(FILES.tickler).catch(() => [])    // Optional
-        ]);
+function loadData() {
+    // Show loading state if possible
+    const subTitle = document.querySelector('header p');
+    if (subTitle) subTitle.innerText = "Loading data from Gmail...";
 
-        appData.moveOuts = moveOuts;
-        appData.vacancies = vacancies;
-        appData.inspections = inspections;
-        appData.workOrders = workOrders;
-        appData.ticklers = ticklers;
-
-        processData();
-        renderDashboard();
-    } catch (error) {
-        console.error("Error loading data:", error);
-        alert("Failed to load critical CSV data.");
-    }
+    google.script.run
+        .withSuccessHandler(onDataLoaded)
+        .withFailureHandler(onDataLoadError)
+        .getData();
 }
 
-function fetchCSV(filename) {
-    return new Promise((resolve, reject) => {
-        Papa.parse(filename, {
-            download: true,
-            header: true,
-            skipEmptyLines: true,
-            complete: (results) => resolve(results.data),
-            error: (err) => reject(err)
-        });
-    });
+function onDataLoaded(response) {
+    if (response.status !== 'success') {
+        console.error("Server Error:", response.message);
+        alert("Server reported an error: " + response.message);
+        return;
+    }
+
+    const data = response.data;
+    console.log("Data loaded successfully", data);
+
+    if (data.debug) {
+        console.log("Server Debug Logs:", data.debug.join('\n'));
+    }
+
+    // Map server data to appData structure
+    appData.moveOuts = data.moveOuts || [];
+    appData.vacancies = data.vacancies || [];
+    appData.inspections = data.inspections || [];
+    appData.workOrders = data.workOrders || [];
+    // If ticklers are separate in your logic, handle them. 
+    // Currently GmailFetcher merges tenant_tickler into moveOuts or doesn't explicitly separate them in the return object 
+    // unless we change GmailFetcher. 
+    // Looking at GmailFetcher, it adds tenant_tickler data to 'moveOuts'. 
+    // So we can leave appData.ticklers empty or alias it if needed.
+    appData.ticklers = [];
+
+    document.getElementById('last-updated-date').innerText = data.timestamp || 'Unknown';
+
+    processData();
+    renderDashboard();
+
+    const subTitle = document.querySelector('header p');
+    if (subTitle) subTitle.innerText = "Data updated: " + (data.timestamp || 'Just now');
+}
+
+function onDataLoadError(error) {
+    console.error("Connection Error:", error);
+    alert("Failed to connect to the server. Please try refreshing.");
 }
 
 function normalizeUnit(unit) {
