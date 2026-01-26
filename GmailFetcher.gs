@@ -1,8 +1,8 @@
 var GmailFetcher = {
   getLatestReportData: function() {
     // 1. SEARCH PHASE
-    // Widen search to 7 days to be absolutely sure we catch something
-    var query = 'subject:(MRB OR "Move Out" OR "Daily Report" OR Report) has:attachment newer_than:7d';
+    var query = 'subject:"MRB Daily Reports" has:attachment newer_than:2d';
+    // Use a wider search limit just in case, but keep query strict
     var threads = GmailApp.search(query, 0, 10);
     
     var debugLog = [];
