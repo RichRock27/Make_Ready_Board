@@ -168,22 +168,44 @@ var GmailFetcher = {
             return []; 
         }
 
-        var headers = table[0];
+        // FIND HEADER ROW DYNAMICALLY
+        var headerRowIndex = -1;
+        var headers = [];
+
+        for (var i = 0; i < Math.min(table.length, 20); i++) {
+            var rowStr = table[i].join(" ").toLowerCase();
+            // Look for known columns to identify header row
+            if (rowStr.includes("property name") || rowStr.includes("unit") || rowStr.includes("property")) {
+                headerRowIndex = i;
+                headers = table[i];
+                break;
+            }
+        }
+
+        if (headerRowIndex === -1) {
+            // Fallback: Use row 0 if we assume it's valid but weirdly named
+            headerRowIndex = 0;
+            headers = table[0];
+            if(debugLog) debugLog.push("          -> WARNING: Could not detect standard headers. Using Row 0.");
+        }
+
         // Clean headers
         for(var h=0; h<headers.length; h++) headers[h] = headers[h].trim();
 
         var result = [];
-        for (var i = 1; i < table.length; i++) {
+        // Start processing AFTER the header row
+        for (var i = headerRowIndex + 1; i < table.length; i++) {
             var row = table[i];
             if (row.length === 0) continue; // Skip totally empty lines
             
             var obj = {};
-            // Map header to value, being careful not to overflow if row is short
+            // Map header to value
             for (var j = 0; j < headers.length; j++) {
                 if (j < row.length) {
                     obj[headers[j]] = row[j];
                 } else {
-                    obj[headers[j]] = ""; // Fill missing cols with empty string
+                    obj[headers[j]] = ""; 
+
                 }
             }
             result.push(obj);
