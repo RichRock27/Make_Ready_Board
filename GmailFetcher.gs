@@ -169,24 +169,25 @@ var GmailFetcher = {
         }
 
         // FIND HEADER ROW DYNAMICALLY
+        // FIND HEADER ROW DYNAMICALLY
         var headerRowIndex = -1;
         var headers = [];
 
         for (var i = 0; i < Math.min(table.length, 20); i++) {
             var rowStr = table[i].join(" ").toLowerCase();
-            // Look for known columns to identify header row
-            if (rowStr.includes("property name") || rowStr.includes("unit") || rowStr.includes("property")) {
+            // Look for "Unit" AND "Tags" or "Property" to be sure it's the header
+            if ((rowStr.includes("unit") && rowStr.includes("tags")) || rowStr.includes("property name")) {
                 headerRowIndex = i;
                 headers = table[i];
+                if(debugLog) debugLog.push("          -> DETECTED HEADERS (Row " + i + "): " + JSON.stringify(headers));
                 break;
             }
         }
 
         if (headerRowIndex === -1) {
-            // Fallback: Use row 0 if we assume it's valid but weirdly named
             headerRowIndex = 0;
             headers = table[0];
-            if(debugLog) debugLog.push("          -> WARNING: Could not detect standard headers. Using Row 0.");
+            if(debugLog) debugLog.push("          -> WARNING: Could not detect standard headers. Using Row 0: " + JSON.stringify(headers));
         }
 
         // Clean headers
@@ -205,9 +206,32 @@ var GmailFetcher = {
                     obj[headers[j]] = row[j];
                 } else {
                     obj[headers[j]] = ""; 
-
                 }
             }
+
+            // FILTER: SKIP GROUP HEADERS (Start with ->) AND SUMMARIES
+            // In the CSV, Group Headers have empty "Property" fields (cols 19/20).
+            // Data rows have "Property" field populated.
+            // Also, Group Headers usually have the "Unit" column starting with "->".
+            
+            var unitVal = obj['Unit'] || "";
+            var propVal = obj['Property'] || obj['Property Name'] || "";
+
+            if (unitVal.trim().startsWith("->")) {
+                 // Skip Group Header
+                 continue;
+            }
+            if (!propVal && !unitVal) {
+                // Skip Empty/Junk Row
+                continue;
+            }
+            // If Property is missing but Unit is present, it might be a valid row with missing data, 
+            // OR it might be a summary row if Unit is "Total".
+            if (unitVal === "Total") continue;
+
+            // If we have a unit but no property, we might need a fallback, but per analysis, Data Rows have Property.
+            // We will include it and let the Frontend filter if needed.
+            
             result.push(obj);
         }
         return result;
