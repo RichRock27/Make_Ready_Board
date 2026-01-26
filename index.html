@@ -608,17 +608,17 @@
 
         function normalizeUnit(unit) { return unit ? unit.toString().trim() : "Unknown"; }
 
-        // EXTRACT PROPERTY CODE: "11FIF6000 - SOME ADDRESS" -> "11FIF6000"
-        function getPropCode(rawStr) {
-            if (!rawStr) return "UNKNOWN";
-            // Grab first chunk before space or hyphen
-            const parts = rawStr.split(/[\s-]+/);
-            return parts[0] ? parts[0].trim().toUpperCase() : "UNKNOWN";
+        // EXPLICIT KEY GENERATION: Trust 'Property Name' completely.
+        function getKey(propName, unit) {
+            if (!propName) return null; // Garbage data
+            // Ensure both are trimmed strings
+            return `${propName.trim()}-${normalizeUnit(unit)}`;
         }
 
-        function deriveTerritory(propCode) {
-            if (!propCode || propCode.length < 2) return 'Other';
-            const prefix = propCode.substring(0, 2);
+        // Simple Territory extraction from the first 2 chars of the clean ID
+        function deriveTerritory(propName) {
+            if (!propName || propName.length < 2) return 'Other';
+            const prefix = propName.trim().substring(0, 2);
             switch (prefix) {
                 case '11': return 'Commercial';
                 case '12': return 'COS';
@@ -631,106 +631,111 @@
             }
         }
 
-        // Helper to find value from multiple potential column names (fuzzy match)
-        function getSmartVal(row, possibleNames) {
-            const rowKeys = Object.keys(row);
-            for (const name of possibleNames) {
-                if (row[name]) return row[name];
-                const foundKey = rowKeys.find(k => k.toLowerCase().trim() === name.toLowerCase().trim());
-                if (foundKey && row[foundKey]) return row[foundKey];
-            }
-            return '';
-        }
-
         function processData(rawData) {
             if (!rawData) return;
             const merged = new Map();
-            // NEW KEY LOGIC: Match based on extracted Property Code + Unit
-            const getKey = (propStr, unit) => `${getPropCode(propStr)}-${normalizeUnit(unit)}`;
             const safeInt = (v) => parseInt(v) || 0;
 
+            // 1. BASE: VACANCIES (The "Truth")
             if (rawData.vacancies) {
                 rawData.vacancies.forEach(row => {
-                    let prop = getSmartVal(row, ['Property', 'Property Name']);
+                    // TRUST: 'Property Name' is the ID (e.g. 14PEA1720)
+                    const prop = row['Property Name'];
                     if (!prop || prop === 'Total') return;
 
-                    const unit = getSmartVal(row, ['Unit', 'Unit Name']);
+                    const unit = row['Unit'];
                     const key = getKey(prop, unit);
-                    // Store full prop name for display, but use code for logic if needed
-                    const pCode = getPropCode(prop);
 
                     merged.set(key, {
                         key: key,
-                        property: prop,
-                        propCode: pCode,
-                        territory: deriveTerritory(pCode),
+                        property: prop, // Display Name AND ID are the same
+                        territory: deriveTerritory(prop),
                         unit: normalizeUnit(unit),
-                        daysVacant: safeInt(getSmartVal(row, ['Days Vacant', 'Days'])),
-                        rentReady: (getSmartVal(row, ['Rent Ready']).toLowerCase() === 'yes'),
-                        postedWeb: (getSmartVal(row, ['Posted To Website']).toLowerCase() === 'yes'),
-                        postedNet: (getSmartVal(row, ['Posted To Internet']).toLowerCase() === 'yes'),
-                        moveOutDate: null, inspectionStatus: 'NONE', workOrderStatus: 'NONE', workOrderEst: ''
+                        daysVacant: safeInt(row['Days Vacant']),
+                        rentReady: (row['Rent Ready'] || '').toLowerCase() === 'yes',
+                        postedWeb: (row['Posted To Website'] || '').toLowerCase() === 'yes',
+                        postedNet: (row['Posted To Internet'] || '').toLowerCase() === 'yes',
+                        // Placeholders to be filled
+                        moveOutDate: null,
+                        inspectionStatus: 'NONE',
+                        workOrderStatus: 'NONE',
+                        workOrderEst: ''
                     });
                 });
             }
 
+            // 2. ENRICH: MOVE OUTS
             if (rawData.moveOuts) {
                 rawData.moveOuts.forEach(row => {
-                    let prop = getSmartVal(row, ['Property', 'Property Name']);
+                    const prop = row['Property Name'];
                     if (!prop) return;
 
-                    const unit = getSmartVal(row, ['Unit', 'Unit Name']);
-                    // Use same fuzzy key generation to ensure match
+                    const unit = row['Unit'];
                     const key = getKey(prop, unit);
-                    const mDate = getSmartVal(row, ['Move Out Date', 'Move-out Date', 'Vacate Date', 'Date']);
+                    const mDate = row['Move Out Date'] || row['Move-out Date'];
 
                     if (merged.has(key)) {
                         merged.get(key).moveOutDate = mDate;
                     } else {
-                        // Orphaned move-out (not in vacancy list yet?) - Add it
-                        const pCode = getPropCode(prop);
+                        // Orphaned Move Out (Not currently vacant? Still show it)
                         merged.set(key, {
-                            key: key, property: prop, propCode: pCode,
-                            territory: deriveTerritory(pCode),
+                            key: key,
+                            property: prop,
+                            territory: deriveTerritory(prop),
                             unit: normalizeUnit(unit),
-                            daysVacant: 0, rentReady: false, postedWeb: false, postedNet: false,
+                            daysVacant: 0,
+                            rentReady: false,
+                            postedWeb: false,
+                            postedNet: false,
                             moveOutDate: mDate,
-                            inspectionStatus: 'NONE', workOrderStatus: 'NONE'
+                            inspectionStatus: 'NONE',
+                            workOrderStatus: 'NONE'
                         });
                     }
                 });
             }
 
+            // 3. ENRICH: INSPECTIONS
             if (rawData.inspections) {
                 rawData.inspections.forEach(row => {
-                    let prop = getSmartVal(row, ['Property', 'Property Name']);
+                    const prop = row['Property Name'];
                     if (!prop) return;
-                    const key = getKey(prop, getSmartVal(row, ['Unit']));
-                    const status = (getSmartVal(row, ['Status']) || 'NEW').toUpperCase();
+
+                    const key = getKey(prop, row['Unit']);
+                    const status = (row['Status'] || 'NEW').toUpperCase();
 
                     if (merged.has(key)) {
                         const item = merged.get(key);
-                        if (item.inspectionStatus === 'NONE' || status !== 'DONE') item.inspectionStatus = status;
+                        // Prioritize relevant statuses
+                        if (item.inspectionStatus === 'NONE' || status !== 'DONE') {
+                            item.inspectionStatus = status;
+                        }
                     }
                 });
             }
 
+            // 4. ENRICH: WORK ORDERS
             if (rawData.workOrders) {
                 rawData.workOrders.forEach(row => {
-                    let prop = getSmartVal(row, ['Property', 'Property Name']);
+                    // Work Orders might call it 'Property Name' OR 'Property' (if just the ID)
+                    // Based on CSV, 'Property Name' is safer if available, but let's check.
+                    // The CSV view showed 'Property Name' is valid in the WO csv too.
+                    const prop = row['Property Name'] || row['Property'];
                     if (!prop) return;
-                    const key = getKey(prop, getSmartVal(row, ['Unit']));
-                    const status = getSmartVal(row, ['Status']);
+
+                    const key = getKey(prop, row['Unit']);
+                    const status = row['Status'];
 
                     if (merged.has(key) && status && status !== 'Closed' && status !== 'Cancelled') {
                         merged.get(key).workOrderStatus = status;
-                        merged.get(key).workOrderEst = getSmartVal(row, ['Estimate', 'Estimate Amount', 'Total Estimate', 'Est Amount']);
+                        merged.get(key).workOrderEst = row['Estimate Amount'] || row['Estimate'];
                     }
                 });
             }
 
             appData.masterList = Array.from(merged.values());
             appData.masterList.sort((a, b) => b.daysVacant - a.daysVacant);
+
             const dateSpan = document.getElementById('last-updated-date');
             if (dateSpan) dateSpan.innerText = rawData.timestamp || new Date().toLocaleString();
 
