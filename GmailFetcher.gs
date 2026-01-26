@@ -1,9 +1,10 @@
 var GmailFetcher = {
   getLatestReportData: function() {
     // 1. SEARCH PHASE
+    // Strict query matching the screenshot: 'MRB Daily Reports'
     var query = 'subject:"MRB Daily Reports" has:attachment newer_than:2d';
-    // Use a wider search limit just in case, but keep query strict
-    var threads = GmailApp.search(query, 0, 10);
+    // Fetch up to 20 threads to ensure we get all the separate emails (Vacancy, WO, Insp, etc)
+    var threads = GmailApp.search(query, 0, 20);
     
     var debugLog = [];
     debugLog.push("=== START DEBUG LOG ===");
@@ -21,77 +22,56 @@ var GmailFetcher = {
        return result;
     }
 
-    // 2. EMAIL SELECTION PHASE
-    // Iterate through threads to find the most relevant one
-    var bestMsg = null;
-    
-    // Sort threads by date just in case
-    // (GmailApp.search usually returns newest first, but let's be safe)
+    // Set timestamp to the date of the newest thread found
+    var newestDate = threads[0].getLastMessageDate();
+    result.timestamp = newestDate.toLocaleString();
+    debugLog.push("Newest Email Date: " + result.timestamp);
+
+    // 2. PROCESSING PHASE: Iterate through ALL threads
+    // The user receives separate emails for each report type, so we must scan all of them.
     for (var i = 0; i < threads.length; i++) {
         var thread = threads[i];
         var msgs = thread.getMessages();
-        var msg = msgs[msgs.length - 1]; // Get latest message in thread
-        var date = msg.getDate();
+        var msg = msgs[msgs.length - 1]; // Get latest message in this specific thread
         var subject = msg.getSubject();
         
-        debugLog.push("[" + i + "] Subject: '" + subject + "' | Date: " + date);
-        
-        // Simple logic: Take the newest one
-        // You could add logic here to skip specific subjects if needed
-        if (!bestMsg) {
-             bestMsg = msg;
-        }
-    }
+        debugLog.push("[" + i + "] Scanning: '" + subject + "'");
 
-    if (!bestMsg) {
-        debugLog.push("Error: Could not identify a valid message.");
-        return result;
-    }
-
-    result.timestamp = bestMsg.getDate().toLocaleString();
-    debugLog.push("SELECTED EMAIL: '" + bestMsg.getSubject() + "' from " + result.timestamp);
-
-    // 3. ATTACHMENT PROCESSING PHASE
-    var attachments = bestMsg.getAttachments();
-    debugLog.push("Attachments found: " + attachments.length);
-
-    for (var j = 0; j < attachments.length; j++) {
-        var att = attachments[j];
-        var name = att.getName().toLowerCase();
-        var parsedData = [];
-        
-        // Debug file name to see exactly what we are getting
-        debugLog.push("Checking File [" + j + "]: " + att.getName());
-
-        try {
-            var content = att.getDataAsString();
+        var attachments = msg.getAttachments();
+        for (var j = 0; j < attachments.length; j++) {
+            var att = attachments[j];
+            var name = att.getName().toLowerCase();
+            var parsedData = [];
             
-            // LOGIC: Use loose matching to catch variations
-            if (name.indexOf('tenant_tickler') > -1 || name.indexOf('tenant tickler') > -1) {
-                 parsedData = this.parseCSV(content, debugLog);
-                 result.moveOuts = result.moveOuts.concat(parsedData);
-                 debugLog.push("  -> MATCH: Identified as Move Out/Tickler. Rows: " + parsedData.length);
-            } 
-            else if (name.indexOf('unit_vacancy') > -1 || name.indexOf('unit vacancy') > -1) {
-                 parsedData = this.parseCSV(content, debugLog);
-                 result.vacancies = result.vacancies.concat(parsedData);
-                 debugLog.push("  -> MATCH: Identified as Unit Vacancy. Rows: " + parsedData.length);
+            try {
+                var content = att.getDataAsString();
+                
+                if (name.indexOf('tenant_tickler') > -1 || name.indexOf('tenant tickler') > -1) {
+                     parsedData = this.parseCSV(content, debugLog);
+                     result.moveOuts = result.moveOuts.concat(parsedData);
+                     debugLog.push("    -> MATCH: Move Out/Tickler (" + parsedData.length + " rows)");
+                } 
+                else if (name.indexOf('unit_vacancy') > -1 || name.indexOf('unit vacancy') > -1) {
+                     parsedData = this.parseCSV(content, debugLog);
+                     result.vacancies = result.vacancies.concat(parsedData);
+                     debugLog.push("    -> MATCH: Unit Vacancy (" + parsedData.length + " rows)");
+                }
+                else if (name.indexOf('inspection_detail') > -1 || name.indexOf('inspection detail') > -1) {
+                     parsedData = this.parseCSV(content, debugLog);
+                     result.inspections = result.inspections.concat(parsedData);
+                     debugLog.push("    -> MATCH: Inspection (" + parsedData.length + " rows)");
+                }
+                else if (name.indexOf('work_order') > -1 || name.indexOf('work order') > -1) {
+                     parsedData = this.parseCSV(content, debugLog);
+                     result.workOrders = result.workOrders.concat(parsedData);
+                     debugLog.push("    -> MATCH: Work Order (" + parsedData.length + " rows)");
+                }
+                else {
+                     debugLog.push("    -> IGNORED: " + name);
+                }
+            } catch (e) {
+                debugLog.push("    -> ERROR processing attachment: " + e.toString());
             }
-            else if (name.indexOf('inspection_detail') > -1 || name.indexOf('inspection detail') > -1) {
-                 parsedData = this.parseCSV(content, debugLog);
-                 result.inspections = result.inspections.concat(parsedData);
-                 debugLog.push("  -> MATCH: Identified as Inspection. Rows: " + parsedData.length);
-            }
-            else if (name.indexOf('work_order') > -1 || name.indexOf('work order') > -1) {
-                 parsedData = this.parseCSV(content, debugLog);
-                 result.workOrders = result.workOrders.concat(parsedData);
-                 debugLog.push("  -> MATCH: Identified as Work Order. Rows: " + parsedData.length);
-            }
-            else {
-                 debugLog.push("  -> IGNORED: Filename did not match any known patterns.");
-            }
-        } catch (e) {
-            debugLog.push("  -> ERROR reading file: " + e.toString());
         }
     }
     
