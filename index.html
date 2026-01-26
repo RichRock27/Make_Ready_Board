@@ -647,20 +647,28 @@
             }
         }
 
+        // CLIENT SIDE LOGGER
+        function logToScreen(msg) {
+            const debugEl = document.getElementById('debug-log');
+            if (debugEl) {
+                const time = new Date().toLocaleTimeString();
+                debugEl.textContent += `\n[CLIENT ${time}] ${msg}`;
+            }
+            console.log(msg);
+        }
+
         function processData(rawData) {
-            console.log("Processing Data...", rawData);
-            if (!rawData) return;
+            logToScreen("Starting ProcessData...");
+            if (!rawData) { logToScreen("Error: rawData is null"); return; }
+
             const merged = new Map();
             const safeInt = (v) => parseInt(v) || 0;
 
-            // HELPER: Fuzzy match column names (handles "Property Name " vs "Property Name")
+            // HELPER: Fuzzy match column names
             const getCol = (row, colName) => {
                 if (!row) return "";
                 const cleanName = colName.toLowerCase().trim();
-                // 1. Direct match first
                 if (row[colName] !== undefined) return row[colName];
-
-                // 2. Scan keys
                 const keys = Object.keys(row);
                 for (let k of keys) {
                     if (k.toLowerCase().trim() === cleanName) return row[k];
@@ -668,161 +676,170 @@
                 return "";
             };
 
-            // 1. BASE: VACANCIES (The "Truth")
-            if (rawData.vacancies) {
-                rawData.vacancies.forEach(row => {
-                    const prop = getCol(row, 'Property Name');
-                    if (!prop || prop === 'Total') return;
+            // 1. BASE: VACANCIES
+            if (rawData.vacancies && rawData.vacancies.length > 0) {
+                logToScreen(`Found ${rawData.vacancies.length} Vacancy Rows.`);
 
-                    const unit = getCol(row, 'Unit');
-                    const key = getKey(prop, unit);
+                // DEBUG FIRST ROW
+                const first = rawData.vacancies[0];
+                logToScreen(`Row 0 Keys: ${JSON.stringify(Object.keys(first))}`);
+                logToScreen(`Row 0 'Property Name' check: '${getCol(first, 'Property Name')}'`);
 
-                    merged.set(key, {
-                        key: key,
-                        property: prop,
-                        territory: deriveTerritory(prop),
-                        unit: normalizeUnit(unit),
-                        daysVacant: safeInt(getCol(row, 'Days Vacant')),
-                        rentReady: (getCol(row, 'Rent Ready') || '').toLowerCase() === 'yes',
-                        postedWeb: (getCol(row, 'Posted To Website') || '').toLowerCase() === 'yes',
-                        postedNet: (getCol(row, 'Posted To Internet') || '').toLowerCase() === 'yes',
-                        // Placeholders
-                        moveOutDate: null,
-                        inspectionStatus: 'NONE',
-                        workOrderStatus: 'NONE',
-                        workOrderEst: ''
-                    });
-                });
-            }
+                // 1. BASE: VACANCIES (The "Truth")
+                if (rawData.vacancies) {
+                    rawData.vacancies.forEach(row => {
+                        const prop = getCol(row, 'Property Name');
+                        if (!prop || prop === 'Total') return;
 
-            // 2. ENRICH: MOVE OUTS
-            if (rawData.moveOuts) {
-                rawData.moveOuts.forEach(row => {
-                    const prop = getCol(row, 'Property Name');
-                    if (!prop) return;
+                        const unit = getCol(row, 'Unit');
+                        const key = getKey(prop, unit);
 
-                    const unit = getCol(row, 'Unit');
-                    const key = getKey(prop, unit);
-                    const mDate = getCol(row, 'Move Out Date') || getCol(row, 'Move-out Date');
-
-                    if (merged.has(key)) {
-                        merged.get(key).moveOutDate = mDate;
-                    } else {
-                        // Orphaned Move Out
                         merged.set(key, {
                             key: key,
                             property: prop,
                             territory: deriveTerritory(prop),
                             unit: normalizeUnit(unit),
-                            daysVacant: 0,
-                            rentReady: false,
-                            postedWeb: false,
-                            postedNet: false,
-                            moveOutDate: mDate,
+                            daysVacant: safeInt(getCol(row, 'Days Vacant')),
+                            rentReady: (getCol(row, 'Rent Ready') || '').toLowerCase() === 'yes',
+                            postedWeb: (getCol(row, 'Posted To Website') || '').toLowerCase() === 'yes',
+                            postedNet: (getCol(row, 'Posted To Internet') || '').toLowerCase() === 'yes',
+                            // Placeholders
+                            moveOutDate: null,
                             inspectionStatus: 'NONE',
-                            workOrderStatus: 'NONE'
+                            workOrderStatus: 'NONE',
+                            workOrderEst: ''
                         });
-                    }
-                });
-            }
+                    });
+                }
 
-            // 3. ENRICH: INSPECTIONS
-            if (rawData.inspections) {
-                rawData.inspections.forEach(row => {
-                    const prop = getCol(row, 'Property Name');
-                    if (!prop) return;
+                // 2. ENRICH: MOVE OUTS
+                if (rawData.moveOuts) {
+                    rawData.moveOuts.forEach(row => {
+                        const prop = getCol(row, 'Property Name');
+                        if (!prop) return;
 
-                    const key = getKey(prop, getCol(row, 'Unit'));
-                    // Default to NEW if status is missing but row exists
-                    const status = (getCol(row, 'Status') || 'NEW').toUpperCase();
+                        const unit = getCol(row, 'Unit');
+                        const key = getKey(prop, unit);
+                        const mDate = getCol(row, 'Move Out Date') || getCol(row, 'Move-out Date');
 
-                    if (merged.has(key)) {
-                        const item = merged.get(key);
-                        if (item.inspectionStatus === 'NONE' || status !== 'DONE') {
-                            item.inspectionStatus = status;
+                        if (merged.has(key)) {
+                            merged.get(key).moveOutDate = mDate;
+                        } else {
+                            // Orphaned Move Out
+                            merged.set(key, {
+                                key: key,
+                                property: prop,
+                                territory: deriveTerritory(prop),
+                                unit: normalizeUnit(unit),
+                                daysVacant: 0,
+                                rentReady: false,
+                                postedWeb: false,
+                                postedNet: false,
+                                moveOutDate: mDate,
+                                inspectionStatus: 'NONE',
+                                workOrderStatus: 'NONE'
+                            });
                         }
-                    }
-                });
-            }
-
-            // 4. ENRICH: WORK ORDERS
-            if (rawData.workOrders) {
-                rawData.workOrders.forEach(row => {
-                    const prop = getCol(row, 'Property Name');
-                    if (!prop) return;
-
-                    const key = getKey(prop, getCol(row, 'Unit'));
-                    const status = getCol(row, 'Status');
-
-                    if (merged.has(key) && status && status !== 'Closed' && status !== 'Cancelled') {
-                        merged.get(key).workOrderStatus = status;
-                        merged.get(key).workOrderEst = getCol(row, 'Estimate Amount');
-                    }
-                });
-            }
-
-            appData.masterList = Array.from(merged.values());
-            console.log("Merged Data Points:", appData.masterList.length);
-            appData.masterList.sort((a, b) => b.daysVacant - a.daysVacant);
-
-            const dateSpan = document.getElementById('last-updated-date');
-            if (dateSpan) dateSpan.innerText = rawData.timestamp || new Date().toLocaleString();
-
-            populateTerritoryFilter();
-            populatePropertyFilter();
-        }
-
-        // ... (populateTerritoryFilter/populatePropertyFilter stay same) ...
-
-        function renderDashboard() {
-            const tableBody = document.getElementById('table-body');
-            if (!tableBody) return;
-            tableBody.innerHTML = '';
-
-            const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : 'all'; };
-            const fTerritory = getVal('filter-territory');
-            const fProp = getVal('filter-property');
-            const fReady = getVal('filter-ready');
-            const fInsp = getVal('filter-inspection');
-            const fWeb = getVal('filter-web');
-            const fNet = getVal('filter-net');
-            const searchEl = document.getElementById('search-input');
-            const fSearch = searchEl ? searchEl.value.toLowerCase() : '';
-
-            const filtered = appData.masterList.filter(item => {
-                if (fTerritory !== 'all' && item.territory !== fTerritory) return false;
-                if (fProp !== 'all' && item.property !== fProp) return false;
-                if (fReady === 'Yes' && !item.rentReady) return false;
-                if (fReady === 'No' && item.rentReady) return false;
-                if (fInsp !== 'all' && item.inspectionStatus !== fInsp) return false;
-                if (fWeb === 'Yes' && !item.postedWeb) return false;
-                if (fWeb === 'No' && item.postedWeb) return false;
-                if (fNet === 'Yes' && !item.postedNet) return false;
-                if (fNet === 'No' && item.postedNet) return false;
-                if (fSearch) {
-                    const text = `${item.property} ${item.unit}`.toLowerCase();
-                    if (!text.includes(fSearch)) return false;
-                }
-                return true;
-            });
-
-            updateStats(filtered);
-
-            filtered.forEach(item => {
-                const tr = document.createElement('tr');
-                let inspBadgeClass = 'badge-none';
-                if (item.inspectionStatus === 'NEW') inspBadgeClass = 'badge-new';
-                else if (item.inspectionStatus === 'IN PROGRESS') inspBadgeClass = 'badge-progress';
-                else if (item.inspectionStatus === 'DONE') inspBadgeClass = 'badge-done';
-
-                let woHtml = '<span class="badge badge-none">None</span>';
-                if (item.workOrderStatus !== 'NONE') {
-                    woHtml = `<div style="display:flex;flex-direction:column;gap:2px"><span class="badge badge-progress">${item.workOrderStatus}</span>${item.workOrderEst ? `<span style="font-size:10px;color:var(--text-secondary)">$${item.workOrderEst}</span>` : ''}</div>`;
+                    });
                 }
 
-                const alertStyle = (item.rentReady && (!item.postedWeb || !item.postedNet)) ? 'background:rgba(239,68,68,0.1); border-left:2px solid var(--danger);' : '';
+                // 3. ENRICH: INSPECTIONS
+                if (rawData.inspections) {
+                    rawData.inspections.forEach(row => {
+                        const prop = getCol(row, 'Property Name');
+                        if (!prop) return;
 
-                tr.innerHTML = `
+                        const key = getKey(prop, getCol(row, 'Unit'));
+                        // Default to NEW if status is missing but row exists
+                        const status = (getCol(row, 'Status') || 'NEW').toUpperCase();
+
+                        if (merged.has(key)) {
+                            const item = merged.get(key);
+                            if (item.inspectionStatus === 'NONE' || status !== 'DONE') {
+                                item.inspectionStatus = status;
+                            }
+                        }
+                    });
+                }
+
+                // 4. ENRICH: WORK ORDERS
+                if (rawData.workOrders) {
+                    rawData.workOrders.forEach(row => {
+                        const prop = getCol(row, 'Property Name');
+                        if (!prop) return;
+
+                        const key = getKey(prop, getCol(row, 'Unit'));
+                        const status = getCol(row, 'Status');
+
+                        if (merged.has(key) && status && status !== 'Closed' && status !== 'Cancelled') {
+                            merged.get(key).workOrderStatus = status;
+                            merged.get(key).workOrderEst = getCol(row, 'Estimate Amount');
+                        }
+                    });
+                }
+
+                appData.masterList = Array.from(merged.values());
+                console.log("Merged Data Points:", appData.masterList.length);
+                appData.masterList.sort((a, b) => b.daysVacant - a.daysVacant);
+
+                const dateSpan = document.getElementById('last-updated-date');
+                if (dateSpan) dateSpan.innerText = rawData.timestamp || new Date().toLocaleString();
+
+                populateTerritoryFilter();
+                populatePropertyFilter();
+            }
+
+            // ... (populateTerritoryFilter/populatePropertyFilter stay same) ...
+
+            function renderDashboard() {
+                const tableBody = document.getElementById('table-body');
+                if (!tableBody) return;
+                tableBody.innerHTML = '';
+
+                const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : 'all'; };
+                const fTerritory = getVal('filter-territory');
+                const fProp = getVal('filter-property');
+                const fReady = getVal('filter-ready');
+                const fInsp = getVal('filter-inspection');
+                const fWeb = getVal('filter-web');
+                const fNet = getVal('filter-net');
+                const searchEl = document.getElementById('search-input');
+                const fSearch = searchEl ? searchEl.value.toLowerCase() : '';
+
+                const filtered = appData.masterList.filter(item => {
+                    if (fTerritory !== 'all' && item.territory !== fTerritory) return false;
+                    if (fProp !== 'all' && item.property !== fProp) return false;
+                    if (fReady === 'Yes' && !item.rentReady) return false;
+                    if (fReady === 'No' && item.rentReady) return false;
+                    if (fInsp !== 'all' && item.inspectionStatus !== fInsp) return false;
+                    if (fWeb === 'Yes' && !item.postedWeb) return false;
+                    if (fWeb === 'No' && item.postedWeb) return false;
+                    if (fNet === 'Yes' && !item.postedNet) return false;
+                    if (fNet === 'No' && item.postedNet) return false;
+                    if (fSearch) {
+                        const text = `${item.property} ${item.unit}`.toLowerCase();
+                        if (!text.includes(fSearch)) return false;
+                    }
+                    return true;
+                });
+
+                updateStats(filtered);
+
+                filtered.forEach(item => {
+                    const tr = document.createElement('tr');
+                    let inspBadgeClass = 'badge-none';
+                    if (item.inspectionStatus === 'NEW') inspBadgeClass = 'badge-new';
+                    else if (item.inspectionStatus === 'IN PROGRESS') inspBadgeClass = 'badge-progress';
+                    else if (item.inspectionStatus === 'DONE') inspBadgeClass = 'badge-done';
+
+                    let woHtml = '<span class="badge badge-none">None</span>';
+                    if (item.workOrderStatus !== 'NONE') {
+                        woHtml = `<div style="display:flex;flex-direction:column;gap:2px"><span class="badge badge-progress">${item.workOrderStatus}</span>${item.workOrderEst ? `<span style="font-size:10px;color:var(--text-secondary)">$${item.workOrderEst}</span>` : ''}</div>`;
+                    }
+
+                    const alertStyle = (item.rentReady && (!item.postedWeb || !item.postedNet)) ? 'background:rgba(239,68,68,0.1); border-left:2px solid var(--danger);' : '';
+
+                    tr.innerHTML = `
                     <td><strong>${item.property}</strong></td>
                     <td>${item.unit}</td>
                     <td>${item.moveOutDate || '-'}</td>
@@ -832,19 +849,19 @@
                     <td><div style="display:flex;align-items:center;"><span class="status-dot ${item.rentReady ? 'green' : 'red'}"></span>${item.rentReady ? 'Yes' : 'No'}</div></td>
                     <td style="${alertStyle}"><div style="display:flex;gap:4px;"><span class="badge ${item.postedWeb ? 'badge-new' : 'badge-none'}">WEB</span><span class="badge ${item.postedNet ? 'badge-new' : 'badge-none'}">NET</span></div></td>
                 `;
-                tableBody.appendChild(tr);
-            });
-        }
+                    tableBody.appendChild(tr);
+                });
+            }
 
-        function updateStats(data) {
-            const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
-            setTxt('val-vacant', data.length);
-            setTxt('val-not-ready', data.filter(i => !i.rentReady).length);
-            setTxt('val-no-insp', data.filter(i => i.inspectionStatus === 'NONE').length);
-            const days = data.map(i => i.daysVacant).filter(d => d > 0);
-            const avg = days.length ? Math.round(days.reduce((a, b) => a + b, 0) / days.length) : 0;
-            setTxt('val-avg-days', avg);
-        }
+            function updateStats(data) {
+                const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
+                setTxt('val-vacant', data.length);
+                setTxt('val-not-ready', data.filter(i => !i.rentReady).length);
+                setTxt('val-no-insp', data.filter(i => i.inspectionStatus === 'NONE').length);
+                const days = data.map(i => i.daysVacant).filter(d => d > 0);
+                const avg = days.length ? Math.round(days.reduce((a, b) => a + b, 0) / days.length) : 0;
+                setTxt('val-avg-days', avg);
+            }
     </script>
 </body>
 
