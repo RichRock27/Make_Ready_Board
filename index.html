@@ -336,33 +336,54 @@
             background: var(--danger);
             box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
         }
+
+        /* Loading Overlay with Failsafe */
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.9);
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+            pointer-events: none;
+            /* CRITICAL: Allows clicks to pass through when this overlay is hidden/invisible */
+        }
+
+        #loading-overlay.active {
+            display: flex;
+            pointer-events: all;
+            /* Blocks clicks only when active */
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
     </style>
 </head>
 
 <body>
-    <!-- DEBUG CONSOLE -->
-    <div id="debug-console"
-        style="position:fixed; bottom:0; right:0; width:400px; height:200px; background:rgba(0,0,0,0.8); color:lime; font-family:monospace; font-size:12px; overflow-y:scroll; z-index:9999; padding:10px; border-top:2px solid lime; pointer-events:none;">
-        <div>Debug Console Active...</div>
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <div id="loading-text" style="font-size:16px; color:white;">Checking Email for Reports...</div>
     </div>
-    <script>
-        function log(msg) {
-            const d = document.getElementById('debug-console');
-            if (d) {
-                d.innerHTML += `<div>${new Date().toLocaleTimeString()} - ${msg}</div>`;
-                d.scrollTop = d.scrollHeight;
-            }
-            console.log(msg);
-        }
-
-        window.onclick = function (e) {
-            log(`Click detected on: <${e.target.tagName}> class="${e.target.className}" id="${e.target.id}"`);
-        };
-
-        window.onerror = function (msg, url, line) {
-            log(`ERROR: ${msg} at line ${line}`);
-        };
-    </script>
 
     <div class="app-container">
         <!-- Sidebar -->
@@ -479,8 +500,19 @@
     <script>
         let appData = { masterList: [] };
 
+        // Global Error Handler to ensure overlay is removed on any JS error
+        window.onerror = function (msg, url, line, col, error) {
+            console.error("Global Error:", msg, error);
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) {
+                overlay.classList.remove('active');
+                overlay.style.display = 'none'; // Force hide
+            }
+            return false;
+        };
+
         document.addEventListener('DOMContentLoaded', () => {
-            console.log("App Initialized - NO OVERLAY VERSION");
+            console.log("App Initialized");
             setupFilters();
             loadData();
         });
@@ -504,8 +536,21 @@
         }
 
         function loadData() {
+            // Show overlay
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) overlay.classList.add('active');
+
             const icon = document.getElementById('refresh-icon');
             if (icon) icon.classList.add('fa-spin');
+
+            // Safety Valve: Force hide overlay after 10 seconds if backend hangs
+            setTimeout(() => {
+                if (overlay && overlay.classList.contains('active')) {
+                    console.warn("Safety Valve: Hiding overlay due to timeout.");
+                    overlay.classList.remove('active');
+                    if (icon) icon.classList.remove('fa-spin');
+                }
+            }, 10000);
 
             // Check Environment
             if (typeof google === 'undefined' || typeof google.script === 'undefined') {
@@ -518,19 +563,34 @@
                             moveOuts: [], inspections: [], workOrders: [], timestamp: "Local Test"
                         }
                     });
-                }, 500);
+                }, 800);
             } else {
-                google.script.run.withSuccessHandler(onDataSuccess).withFailureHandler(onDataFail).getData();
+                try {
+                    google.script.run.withSuccessHandler(onDataSuccess).withFailureHandler(onDataFail).getData();
+                } catch (e) {
+                    onDataFail(e.toString());
+                }
             }
         }
 
         function onDataFail(err) {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) {
+                overlay.classList.remove('active');
+                overlay.style.display = 'none';
+            }
             const icon = document.getElementById('refresh-icon');
             if (icon) icon.classList.remove('fa-spin');
             alert("Error: " + err);
         }
 
         function onDataSuccess(response) {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) {
+                overlay.classList.remove('active');
+                // Ensure it gets out of the way despite transition
+                setTimeout(() => { overlay.style.display = 'none'; }, 200);
+            }
             const icon = document.getElementById('refresh-icon');
             if (icon) icon.classList.remove('fa-spin');
 
