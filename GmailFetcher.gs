@@ -122,6 +122,9 @@ var GmailFetcher = {
                          debugLog.push("          -> IGNORED: Unknown type.");
                     }
                 }
+                }
+            } else {
+                debugLog.push("          -> SKIPPED: Not a CSV (Type: " + att.getContentType() + ", Name: " + name + ")");
             }
         }
       }
