@@ -116,7 +116,7 @@ var GmailFetcher = {
             }
         }
       }
-      }
+
 
       var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yyyy HH:mm:ss");
       debugLog.push("=== PROCESSING COMPLETE ===");
