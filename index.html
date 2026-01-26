@@ -438,6 +438,13 @@
                 <h1>Make Ready Overview</h1>
                 <div class="last-updated">Last Updated: <span id="last-updated-date">Waiting for data...</span></div>
             </header>
+            <div id="debug-container" style="display:none; margin-bottom: 20px;">
+                <div style="background: #2a0000; border: 1px solid #ff4444; border-radius: 8px; padding: 15px;">
+                    <h4 style="color: #ff4444; margin-top: 0; margin-bottom: 10px;">Debug Log (Server)</h4>
+                    <pre id="debug-log"
+                        style="color: #ffcccc; font-family: 'Courier New', monospace; font-size: 11px; white-space: pre-wrap; margin: 0; max-height: 200px; overflow-y: auto;"></pre>
+                </div>
+            </div>
 
             <div class="stats-grid">
                 <div class="stat-card blue">
@@ -594,10 +601,17 @@
             const totalItems = (data.moveOuts?.length || 0) + (data.vacancies?.length || 0);
             if (totalItems === 0) {
                 console.warn("No data returned from server.");
-                let msg = "No relevant data found in the last 5 days of emails.";
+                let msg = "No relevant data found in the last 5 days of emails. See Debug Log on screen.";
+
+                // Show Debug on Screen
                 if (data.debug) {
+                    const debugEl = document.getElementById('debug-log');
+                    const debugCont = document.getElementById('debug-container');
+                    if (debugEl && debugCont) {
+                        debugEl.textContent = Array.isArray(data.debug) ? data.debug.join('\n') : data.debug;
+                        debugCont.style.display = 'block';
+                    }
                     console.log("Server Debug:", data.debug);
-                    msg += "\n\nDebug info logged to console.";
                 }
                 alert(msg);
             }
