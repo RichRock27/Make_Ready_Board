@@ -633,6 +633,20 @@
             }
         }
 
+        // Helper to find value from multiple potential column names (fuzzy match)
+        function getSmartVal(row, possibleNames) {
+            const rowKeys = Object.keys(row);
+            for (const name of possibleNames) {
+                // Exact match
+                if (row[name]) return row[name];
+
+                // Case-insensitive match from row keys
+                const foundKey = rowKeys.find(k => k.toLowerCase().trim() === name.toLowerCase().trim());
+                if (foundKey && row[foundKey]) return row[foundKey];
+            }
+            return '';
+        }
+
         function processData(rawData) {
             if (!rawData) return;
             const merged = new Map();
@@ -641,18 +655,21 @@
 
             if (rawData.vacancies) {
                 rawData.vacancies.forEach(row => {
-                    let prop = row['Property Name'] || row['Property'];
+                    let prop = getSmartVal(row, ['Property', 'Property Name']);
                     if (!prop || prop === 'Total') return;
-                    const key = getKey(prop, row['Unit']);
+
+                    const unit = getSmartVal(row, ['Unit', 'Unit Name']);
+                    const key = getKey(prop, unit);
+
                     merged.set(key, {
                         key: key,
                         property: prop,
                         territory: deriveTerritory(prop),
-                        unit: normalizeUnit(row['Unit']),
-                        daysVacant: safeInt(row['Days Vacant']),
-                        rentReady: (row['Rent Ready'] === 'Yes'),
-                        postedWeb: (row['Posted To Website'] === 'Yes'),
-                        postedNet: (row['Posted To Internet'] === 'Yes'),
+                        unit: normalizeUnit(unit),
+                        daysVacant: safeInt(getSmartVal(row, ['Days Vacant', 'Days'])),
+                        rentReady: (getSmartVal(row, ['Rent Ready']).toLowerCase() === 'yes'),
+                        postedWeb: (getSmartVal(row, ['Posted To Website']).toLowerCase() === 'yes'),
+                        postedNet: (getSmartVal(row, ['Posted To Internet']).toLowerCase() === 'yes'),
                         moveOutDate: null, inspectionStatus: 'NONE', workOrderStatus: 'NONE', workOrderEst: ''
                     });
                 });
@@ -660,27 +677,35 @@
 
             if (rawData.moveOuts) {
                 rawData.moveOuts.forEach(row => {
-                    let prop = row['Property Name'] || row['Property'];
+                    let prop = getSmartVal(row, ['Property', 'Property Name']);
                     if (!prop) return;
-                    const key = getKey(prop, row['Unit']);
+
+                    const unit = getSmartVal(row, ['Unit', 'Unit Name']);
+                    const key = getKey(prop, unit);
+
+                    // Smart search for date
+                    const mDate = getSmartVal(row, ['Move Out Date', 'Move-out Date', 'Vacate Date', 'Date']);
+
                     if (!merged.has(key)) {
                         merged.set(key, {
                             key: key, property: prop,
                             territory: deriveTerritory(prop),
-                            unit: normalizeUnit(row['Unit']),
+                            unit: normalizeUnit(unit),
                             daysVacant: 0, rentReady: false, postedWeb: false, postedNet: false,
-                            moveOutDate: row['Date'] || row['Move Out Date'], inspectionStatus: 'NONE', workOrderStatus: 'NONE'
+                            moveOutDate: mDate,
+                            inspectionStatus: 'NONE', workOrderStatus: 'NONE'
                         });
-                    } else { merged.get(key).moveOutDate = row['Date'] || row['Move Out Date']; }
+                    } else { merged.get(key).moveOutDate = mDate; }
                 });
             }
 
             if (rawData.inspections) {
                 rawData.inspections.forEach(row => {
-                    let prop = row['Property Name'] || row['Property'];
+                    let prop = getSmartVal(row, ['Property', 'Property Name']);
                     if (!prop) return;
-                    const key = getKey(prop, row['Unit']);
-                    const status = (row['Status'] || 'NEW').toUpperCase();
+                    const key = getKey(prop, getSmartVal(row, ['Unit']));
+                    const status = (getSmartVal(row, ['Status']) || 'NEW').toUpperCase();
+
                     if (merged.has(key)) {
                         const item = merged.get(key);
                         if (item.inspectionStatus === 'NONE' || status !== 'DONE') item.inspectionStatus = status;
@@ -690,13 +715,15 @@
 
             if (rawData.workOrders) {
                 rawData.workOrders.forEach(row => {
-                    let prop = row['Property Name'] || row['Property'];
+                    let prop = getSmartVal(row, ['Property', 'Property Name']);
                     if (!prop) return;
-                    const key = getKey(prop, row['Unit']);
-                    const status = row['Status'];
+                    const key = getKey(prop, getSmartVal(row, ['Unit']));
+                    const status = getSmartVal(row, ['Status']);
+
                     if (merged.has(key) && status && status !== 'Closed' && status !== 'Cancelled') {
                         merged.get(key).workOrderStatus = status;
-                        merged.get(key).workOrderEst = row['Estimate Amount'];
+                        // Catch multiple variants of "Estimate"
+                        merged.get(key).workOrderEst = getSmartVal(row, ['Estimate', 'Estimate Amount', 'Total Estimate', 'Est Amount']);
                     }
                 });
             }
