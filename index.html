@@ -552,6 +552,35 @@
             const icon = document.getElementById('refresh-icon');
             if (icon) icon.classList.add('fa-spin');
 
+            // Check if running locally (no google script environment)
+            if (typeof google === 'undefined' || typeof google.script === 'undefined') {
+                console.warn("Google Script Environment not found. Using Mock Data.");
+                setTimeout(() => {
+                    const mockData = {
+                        status: 'success',
+                        data: {
+                            vacancies: [
+                                { "Property": "Sunset Apartments", "Unit": "101", "Days Vacant": "5", "Rent Ready": "Yes", "Posted To Website": "Yes", "Posted To Internet": "Yes" },
+                                { "Property": "Sunset Apartments", "Unit": "204", "Days Vacant": "12", "Rent Ready": "No", "Posted To Website": "No", "Posted To Internet": "No" },
+                                { "Property": "Highland Heights", "Unit": "A-5", "Days Vacant": "45", "Rent Ready": "No", "Posted To Website": "Yes", "Posted To Internet": "No" }
+                            ],
+                            moveOuts: [
+                                { "Property": "Sunset Apartments", "Unit": "105", "Date": "2023-11-01" }
+                            ],
+                            inspections: [
+                                { "Property": "Sunset Apartments", "Unit": "204", "Status": "IN PROGRESS" }
+                            ],
+                            workOrders: [
+                                { "Property": "Sunset Apartments", "Unit": "204", "Status": "Open", "Estimate Amount": "350.00" }
+                            ],
+                            timestamp: "Local Test Data"
+                        }
+                    };
+                    onDataSuccess(mockData);
+                }, 1000);
+                return;
+            }
+
             google.script.run
                 .withSuccessHandler(onDataSuccess)
                 .withFailureHandler(onDataFail)
@@ -572,9 +601,6 @@
                 alert("Server Error: " + response.message);
                 return;
             }
-
-            // Optional: If you want to see debug info in console, uncomment:
-            // if(response.data.debug) console.log(response.data.debug.join('\n'));
 
             processData(response.data);
             renderDashboard();
