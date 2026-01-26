@@ -340,6 +340,30 @@
 </head>
 
 <body>
+    <!-- DEBUG CONSOLE -->
+    <div id="debug-console"
+        style="position:fixed; bottom:0; right:0; width:400px; height:200px; background:rgba(0,0,0,0.8); color:lime; font-family:monospace; font-size:12px; overflow-y:scroll; z-index:9999; padding:10px; border-top:2px solid lime; pointer-events:none;">
+        <div>Debug Console Active...</div>
+    </div>
+    <script>
+        function log(msg) {
+            const d = document.getElementById('debug-console');
+            if (d) {
+                d.innerHTML += `<div>${new Date().toLocaleTimeString()} - ${msg}</div>`;
+                d.scrollTop = d.scrollHeight;
+            }
+            console.log(msg);
+        }
+
+        window.onclick = function (e) {
+            log(`Click detected on: <${e.target.tagName}> class="${e.target.className}" id="${e.target.id}"`);
+        };
+
+        window.onerror = function (msg, url, line) {
+            log(`ERROR: ${msg} at line ${line}`);
+        };
+    </script>
+
     <div class="app-container">
         <!-- Sidebar -->
         <aside class="sidebar">
