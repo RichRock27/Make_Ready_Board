@@ -686,32 +686,40 @@
                 logToScreen(`Row 0 'Property Name' check: '${getCol(first, 'Property Name')}'`);
 
 
+                let successCount = 0;
                 rawData.vacancies.forEach((row, idx) => {
-                    const prop = getCol(row, 'Property Name') || getCol(row, 'Property') || getCol(row, 'Property ID');
-                    if (!prop || prop === 'Total') {
-                        if (idx < 5) logToScreen(`Skipping Row ${idx}: No Property Name found. (Val: '${prop}')`);
-                        return;
+                    try {
+                        const prop = getCol(row, 'Property Name') || getCol(row, 'Property') || getCol(row, 'Property ID');
+                        if (!prop || prop === 'Total') {
+                            // Silent skip for clarity, debug only if needed
+                            // if (idx < 5) logToScreen(`Skipping Row ${idx}: No Property Name found. (Val: '${prop}')`);
+                            return;
+                        }
+
+                        const unit = getCol(row, 'Unit');
+                        const key = getKey(prop, unit);
+
+                        merged.set(key, {
+                            key: key,
+                            property: prop,
+                            territory: deriveTerritory(prop),
+                            unit: normalizeUnit(unit),
+                            daysVacant: safeInt(getCol(row, 'Days Vacant')),
+                            rentReady: (getCol(row, 'Rent Ready') || '').toLowerCase() === 'yes',
+                            postedWeb: (getCol(row, 'Posted To Website') || '').toLowerCase() === 'yes',
+                            postedNet: (getCol(row, 'Posted To Internet') || '').toLowerCase() === 'yes',
+                            // Placeholders
+                            moveOutDate: null,
+                            inspectionStatus: 'NONE',
+                            workOrderStatus: 'NONE',
+                            workOrderEst: ''
+                        });
+                        successCount++;
+                    } catch (err) {
+                        logToScreen(`Error processing row ${idx}: ${err.message}`);
                     }
-
-                    const unit = getCol(row, 'Unit');
-                    const key = getKey(prop, unit);
-
-                    merged.set(key, {
-                        key: key,
-                        property: prop,
-                        territory: deriveTerritory(prop),
-                        unit: normalizeUnit(unit),
-                        daysVacant: safeInt(getCol(row, 'Days Vacant')),
-                        rentReady: (getCol(row, 'Rent Ready') || '').toLowerCase() === 'yes',
-                        postedWeb: (getCol(row, 'Posted To Website') || '').toLowerCase() === 'yes',
-                        postedNet: (getCol(row, 'Posted To Internet') || '').toLowerCase() === 'yes',
-                        // Placeholders
-                        moveOutDate: null,
-                        inspectionStatus: 'NONE',
-                        workOrderStatus: 'NONE',
-                        workOrderEst: ''
-                    });
                 });
+                logToScreen(`Successfully merged ${successCount} Vacancy items.`);
             }
 
             // 2. ENRICH: MOVE OUTS
