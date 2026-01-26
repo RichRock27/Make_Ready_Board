@@ -40,7 +40,6 @@
             min-height: 100vh;
         }
 
-        /* Sidebar */
         .sidebar {
             width: 280px;
             background-color: var(--bg-card);
@@ -120,7 +119,6 @@
             color: var(--text-primary);
         }
 
-        /* Main Content */
         .main-content {
             flex: 1;
             padding: 32px;
@@ -144,7 +142,6 @@
             color: var(--text-secondary);
         }
 
-        /* Stats Grid */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -204,7 +201,6 @@
             color: var(--text-primary);
         }
 
-        /* Content Panel */
         .content-panel {
             background-color: var(--bg-card);
             border-radius: 12px;
@@ -254,7 +250,6 @@
             transform: translateY(1px);
         }
 
-        /* Table */
         .table-container {
             overflow-x: auto;
         }
@@ -293,7 +288,6 @@
             background: rgba(255, 255, 255, 0.02);
         }
 
-        /* Badges */
         .badge {
             padding: 4px 8px;
             border-radius: 4px;
@@ -342,129 +336,60 @@
             background: var(--danger);
             box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
         }
-
-        /* Loading */
-        #loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(15, 23, 42, 0.9);
-            z-index: 1000;
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(5px);
-            pointer-events: none;
-            /* Failsafe: ensure clicks pass through if invisible */
-        }
-
-        #loading-overlay.active {
-            display: flex;
-            pointer-events: all;
-            /* content blocking only when active */
-        }
-
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid var(--border);
-            border-top-color: var(--accent);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-bottom: 16px;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
     </style>
 </head>
 
 <body>
-    <div id="loading-overlay">
-        <div class="spinner"></div>
-        <div id="loading-text" style="font-size:16px; color:white;">Checking Email for Reports...</div>
-    </div>
-
     <div class="app-container">
-        <!-- Sidebar with Filters -->
+        <!-- Sidebar -->
         <aside class="sidebar">
-            <div class="logo">
-                <i class="fa-solid fa-clipboard-check"></i>
-                <span>MakeReady</span>
-            </div>
-
+            <div class="logo"><i class="fa-solid fa-clipboard-check"></i><span>MakeReady</span></div>
             <div class="filter-section">
                 <h3>Core Filters</h3>
-
-                <div class="filter-group">
-                    <label>Property</label>
-                    <select id="filter-property" aria-label="Filter by Property">
+                <div class="filter-group"><label>Property</label><select id="filter-property"
+                        aria-label="Filter Property">
                         <option value="all">All Properties</option>
-                    </select>
-                </div>
-
-                <div class="filter-group">
-                    <label>Rent Ready?</label>
-                    <select id="filter-ready" aria-label="Filter by Rent Ready Status">
+                    </select></div>
+                <div class="filter-group"><label>Rent Ready?</label><select id="filter-ready"
+                        aria-label="Filter Rent Ready">
                         <option value="all">All Statuses</option>
                         <option value="Yes">Yes (Ready)</option>
                         <option value="No">No (Not Ready)</option>
-                    </select>
-                </div>
-
-                <div class="filter-group">
-                    <label>Inspection Status</label>
-                    <select id="filter-inspection">
+                    </select></div>
+                <div class="filter-group"><label>Inspection Status</label><select id="filter-inspection"
+                        aria-label="Filter Inspection">
                         <option value="all">All</option>
                         <option value="NONE">No Inspection</option>
                         <option value="NEW">New</option>
                         <option value="IN PROGRESS">In Progress</option>
                         <option value="DONE">Done</option>
-                    </select>
-                </div>
+                    </select></div>
             </div>
-
             <div class="filter-section">
                 <h3>Marketing Filters</h3>
-
-                <div class="filter-group">
-                    <label>Posted to Website?</label>
-                    <select id="filter-web">
+                <div class="filter-group"><label>Posted to Website?</label><select id="filter-web"
+                        aria-label="Filter Website">
                         <option value="all">All</option>
                         <option value="Yes">Yes</option>
                         <option value="No">No</option>
-                    </select>
-                </div>
-
-                <div class="filter-group">
-                    <label>Posted to Internet?</label>
-                    <select id="filter-net">
+                    </select></div>
+                <div class="filter-group"><label>Posted to Internet?</label><select id="filter-net"
+                        aria-label="Filter Internet">
                         <option value="all">All</option>
                         <option value="Yes">Yes</option>
                         <option value="No">No</option>
-                    </select>
-                </div>
+                    </select></div>
             </div>
-
             <button class="btn-reset" onclick="resetFilters()">Reset All Filters</button>
         </aside>
 
-        <!-- Main Content -->
+        <!-- Main -->
         <main class="main-content">
             <header>
                 <h1>Make Ready Overview</h1>
-                <div class="last-updated">
-                    Last Updated: <span id="last-updated-date">Loading...</span>
-                </div>
+                <div class="last-updated">Last Updated: <span id="last-updated-date">Waiting for data...</span></div>
             </header>
 
-            <!-- Stats -->
             <div class="stats-grid">
                 <div class="stat-card blue">
                     <div class="icon"><i class="fa-solid fa-house-chimney-crack"></i></div>
@@ -496,15 +421,13 @@
                 </div>
             </div>
 
-            <!-- Table -->
             <div class="content-panel">
                 <div class="panel-header">
                     <h2>Unit Status</h2>
                     <div class="actions">
                         <input type="text" id="search-input" placeholder="Search Property or Unit...">
-                        <button class="btn-refresh" onclick="loadData()">
-                            <i class="fa-solid fa-rotate" id="refresh-icon"></i> Refresh Data
-                        </button>
+                        <button class="btn-refresh" onclick="loadData()"><i class="fa-solid fa-rotate"
+                                id="refresh-icon"></i> Refresh Data</button>
                     </div>
                 </div>
                 <div class="table-container">
@@ -522,9 +445,7 @@
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="table-body">
-                            <!-- JS Injected -->
-                        </tbody>
+                        <tbody id="table-body"></tbody>
                     </table>
                 </div>
             </div>
@@ -534,22 +455,10 @@
     <script>
         let appData = { masterList: [] };
 
-        // Global Error Handler to ensure UI never freezes
-        window.onerror = function (msg, url, line, col, error) {
-            console.error("Global Error:", msg, error);
-            // Emergency overlay removal
-            const overlay = document.getElementById('loading-overlay');
-            if (overlay) {
-                overlay.classList.remove('active');
-                overlay.style.display = 'none';
-            }
-            return false;
-        };
-
         document.addEventListener('DOMContentLoaded', () => {
-            console.log("App Initialized");
-            loadData();
+            console.log("App Initialized - NO OVERLAY VERSION");
             setupFilters();
+            loadData();
         });
 
         function setupFilters() {
@@ -571,167 +480,102 @@
         }
 
         function loadData() {
-            // 1. Show Loading Overlay
-            const overlay = document.getElementById('loading-overlay');
-            if (overlay) overlay.classList.add('active');
-
             const icon = document.getElementById('refresh-icon');
             if (icon) icon.classList.add('fa-spin');
 
-            // 2. Safety Valve: Force hide overlay after 10 seconds if backend hangs
-            setTimeout(() => {
-                if (overlay && overlay.classList.contains('active')) {
-                    console.warn("Safety Valve: Hiding overlay due to timeout.");
-                    overlay.classList.remove('active');
-                    if (icon) icon.classList.remove('fa-spin');
-                }
-            }, 10000);
-
-            // 3. Environment Check
+            // Check Environment
             if (typeof google === 'undefined' || typeof google.script === 'undefined') {
-                console.warn("Google Script Environment NOT found. Running in Local/Demo Mode.");
-                // Simulate network delay then load mock data
+                console.log("Local Mode - Loading Mock Data");
                 setTimeout(() => {
-                    const mockData = {
+                    onDataSuccess({
                         status: 'success',
                         data: {
-                            vacancies: [
-                                { "Property": "Sunset Apartments", "Unit": "101", "Days Vacant": 5, "Rent Ready": "Yes", "Posted To Website": "Yes", "Posted To Internet": "Yes" },
-                                { "Property": "Sunset Apartments", "Unit": "204", "Days Vacant": 12, "Rent Ready": "No", "Posted To Website": "No", "Posted To Internet": "No" },
-                                { "Property": "Highland Heights", "Unit": "A-5", "Days Vacant": 45, "Rent Ready": "No", "Posted To Website": "Yes", "Posted To Internet": "No" }
-                            ],
-                            moveOuts: [],
-                            inspections: [],
-                            workOrders: [],
-                            timestamp: "Local Demo Mode"
+                            vacancies: [{ "Property": "Test Prop", "Unit": "101", "Days Vacant": 5, "Rent Ready": "No" }],
+                            moveOuts: [], inspections: [], workOrders: [], timestamp: "Local Test"
                         }
-                    };
-                    onDataSuccess(mockData);
-                }, 800);
-                return;
-            }
-
-            // 4. Call Backend
-            try {
-                google.script.run
-                    .withSuccessHandler(onDataSuccess)
-                    .withFailureHandler(onDataFail)
-                    .getData();
-            } catch (e) {
-                console.error("Backend Call Failed:", e);
-                onDataFail(e.toString());
+                    });
+                }, 500);
+            } else {
+                google.script.run.withSuccessHandler(onDataSuccess).withFailureHandler(onDataFail).getData();
             }
         }
 
         function onDataFail(err) {
-            console.error("Data Fail:", err);
-            hideOverlay();
-            alert("Error loading data: " + err);
+            const icon = document.getElementById('refresh-icon');
+            if (icon) icon.classList.remove('fa-spin');
+            alert("Error: " + err);
         }
 
         function onDataSuccess(response) {
-            hideOverlay();
+            const icon = document.getElementById('refresh-icon');
+            if (icon) icon.classList.remove('fa-spin');
 
             if (!response || response.status !== 'success') {
-                alert("Server Error: " + (response ? response.message : "Unknown error"));
+                alert("Server Error: " + (response ? response.message : "Unknown"));
                 return;
             }
-
             processData(response.data);
             renderDashboard();
         }
 
-        function hideOverlay() {
-            const overlay = document.getElementById('loading-overlay');
-            if (overlay) {
-                overlay.classList.remove('active');
-                // Ensure it gets out of the way
-                setTimeout(() => { overlay.style.display = 'none'; }, 200);
-            }
-            const icon = document.getElementById('refresh-icon');
-            if (icon) icon.classList.remove('fa-spin');
-        }
-
-        function normalizeUnit(unit) {
-            return unit ? unit.toString().trim() : "Unknown";
-        }
+        function normalizeUnit(unit) { return unit ? unit.toString().trim() : "Unknown"; }
 
         function processData(rawData) {
             if (!rawData) return;
             const merged = new Map();
             const getKey = (prop, unit) => `${prop}-${normalizeUnit(unit)}`;
-
-            // Helper to safely parse int
             const safeInt = (v) => parseInt(v) || 0;
 
-            // 1. Vacancy Data
             if (rawData.vacancies) {
                 rawData.vacancies.forEach(row => {
                     let prop = row['Property Name'] || row['Property'];
                     if (!prop || prop === 'Total') return;
-
                     const key = getKey(prop, row['Unit']);
                     merged.set(key, {
-                        key: key,
-                        property: prop,
-                        unit: normalizeUnit(row['Unit']),
+                        key: key, property: prop, unit: normalizeUnit(row['Unit']),
                         daysVacant: safeInt(row['Days Vacant']),
                         rentReady: (row['Rent Ready'] === 'Yes'),
                         postedWeb: (row['Posted To Website'] === 'Yes'),
                         postedNet: (row['Posted To Internet'] === 'Yes'),
-                        moveOutDate: null,
-                        inspectionStatus: 'NONE',
-                        workOrderStatus: 'NONE',
-                        workOrderEst: ''
+                        moveOutDate: null, inspectionStatus: 'NONE', workOrderStatus: 'NONE', workOrderEst: ''
                     });
                 });
             }
 
-            // 2. Move Outs
             if (rawData.moveOuts) {
                 rawData.moveOuts.forEach(row => {
                     let prop = row['Property Name'] || row['Property'];
                     if (!prop) return;
                     const key = getKey(prop, row['Unit']);
-
                     if (!merged.has(key)) {
                         merged.set(key, {
                             key: key, property: prop, unit: normalizeUnit(row['Unit']),
                             daysVacant: 0, rentReady: false, postedWeb: false, postedNet: false,
-                            moveOutDate: row['Date'] || row['Move Out Date'],
-                            inspectionStatus: 'NONE', workOrderStatus: 'NONE'
+                            moveOutDate: row['Date'] || row['Move Out Date'], inspectionStatus: 'NONE', workOrderStatus: 'NONE'
                         });
-                    } else {
-                        merged.get(key).moveOutDate = row['Date'] || row['Move Out Date'];
-                    }
+                    } else { merged.get(key).moveOutDate = row['Date'] || row['Move Out Date']; }
                 });
             }
 
-            // 3. Inspections
             if (rawData.inspections) {
                 rawData.inspections.forEach(row => {
                     let prop = row['Property Name'] || row['Property'];
                     if (!prop) return;
                     const key = getKey(prop, row['Unit']);
                     const status = (row['Status'] || 'NEW').toUpperCase();
-
                     if (merged.has(key)) {
                         const item = merged.get(key);
-                        if (item.inspectionStatus === 'NONE' || status !== 'DONE') {
-                            item.inspectionStatus = status;
-                        }
+                        if (item.inspectionStatus === 'NONE' || status !== 'DONE') item.inspectionStatus = status;
                     }
                 });
             }
 
-            // 4. Work Orders
             if (rawData.workOrders) {
                 rawData.workOrders.forEach(row => {
                     let prop = row['Property Name'] || row['Property'];
                     if (!prop) return;
                     const key = getKey(prop, row['Unit']);
                     const status = row['Status'];
-
                     if (merged.has(key) && status && status !== 'Closed' && status !== 'Cancelled') {
                         merged.get(key).workOrderStatus = status;
                         merged.get(key).workOrderEst = row['Estimate Amount'];
@@ -741,10 +585,8 @@
 
             appData.masterList = Array.from(merged.values());
             appData.masterList.sort((a, b) => b.daysVacant - a.daysVacant);
-
             const dateSpan = document.getElementById('last-updated-date');
             if (dateSpan) dateSpan.innerText = rawData.timestamp || new Date().toLocaleString();
-
             populatePropertyFilter();
         }
 
@@ -753,13 +595,10 @@
             if (!select) return;
             const current = select.value;
             const props = [...new Set(appData.masterList.map(i => i.property))].sort();
-
             select.innerHTML = '<option value="all">All Properties</option>';
             props.forEach(p => {
                 const opt = document.createElement('option');
-                opt.value = p;
-                opt.innerText = p;
-                select.appendChild(opt);
+                opt.value = p; opt.innerText = p; select.appendChild(opt);
             });
             select.value = current;
         }
@@ -769,11 +608,7 @@
             if (!tableBody) return;
             tableBody.innerHTML = '';
 
-            const getVal = (id) => {
-                const el = document.getElementById(id);
-                return el ? el.value : 'all';
-            };
-
+            const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : 'all'; };
             const fProp = getVal('filter-property');
             const fReady = getVal('filter-ready');
             const fInsp = getVal('filter-inspection');
@@ -802,7 +637,6 @@
 
             filtered.forEach(item => {
                 const tr = document.createElement('tr');
-
                 let inspBadgeClass = 'badge-none';
                 if (item.inspectionStatus === 'NEW') inspBadgeClass = 'badge-new';
                 else if (item.inspectionStatus === 'IN PROGRESS') inspBadgeClass = 'badge-progress';
@@ -810,14 +644,10 @@
 
                 let woHtml = '<span class="badge badge-none">None</span>';
                 if (item.workOrderStatus !== 'NONE') {
-                    woHtml = `<div style="display:flex;flex-direction:column;gap:2px">
-                                <span class="badge badge-progress">${item.workOrderStatus}</span>
-                                ${item.workOrderEst ? `<span style="font-size:10px;color:var(--text-secondary)">$${item.workOrderEst}</span>` : ''}
-                              </div>`;
+                    woHtml = `<div style="display:flex;flex-direction:column;gap:2px"><span class="badge badge-progress">${item.workOrderStatus}</span>${item.workOrderEst ? `<span style="font-size:10px;color:var(--text-secondary)">$${item.workOrderEst}</span>` : ''}</div>`;
                 }
 
-                const alertStyle = (item.rentReady && (!item.postedWeb || !item.postedNet))
-                    ? 'background:rgba(239,68,68,0.1); border-left:2px solid var(--danger);' : '';
+                const alertStyle = (item.rentReady && (!item.postedWeb || !item.postedNet)) ? 'background:rgba(239,68,68,0.1); border-left:2px solid var(--danger);' : '';
 
                 tr.innerHTML = `
                     <td><strong>${item.property}</strong></td>
@@ -826,18 +656,8 @@
                     <td>${item.daysVacant}</td>
                     <td><span class="badge ${inspBadgeClass}">${item.inspectionStatus}</span></td>
                     <td>${woHtml}</td>
-                    <td>
-                        <div style="display:flex;align-items:center;">
-                            <span class="status-dot ${item.rentReady ? 'green' : 'red'}"></span>
-                            ${item.rentReady ? 'Yes' : 'No'}
-                        </div>
-                    </td>
-                    <td style="${alertStyle}">
-                        <div style="display:flex;gap:4px;">
-                            <span class="badge ${item.postedWeb ? 'badge-new' : 'badge-none'}">WEB</span>
-                            <span class="badge ${item.postedNet ? 'badge-new' : 'badge-none'}">NET</span>
-                        </div>
-                    </td>
+                    <td><div style="display:flex;align-items:center;"><span class="status-dot ${item.rentReady ? 'green' : 'red'}"></span>${item.rentReady ? 'Yes' : 'No'}</div></td>
+                    <td style="${alertStyle}"><div style="display:flex;gap:4px;"><span class="badge ${item.postedWeb ? 'badge-new' : 'badge-none'}">WEB</span><span class="badge ${item.postedNet ? 'badge-new' : 'badge-none'}">NET</span></div></td>
                     <td><button style="background:none;border:none;color:var(--text-secondary);cursor:pointer;"><i class="fa-solid fa-ellipsis"></i></button></td>
                 `;
                 tableBody.appendChild(tr);
@@ -845,14 +665,10 @@
         }
 
         function updateStats(data) {
-            const setTxt = (id, val) => {
-                const el = document.getElementById(id);
-                if (el) el.innerText = val;
-            };
+            const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
             setTxt('val-vacant', data.length);
             setTxt('val-not-ready', data.filter(i => !i.rentReady).length);
             setTxt('val-no-insp', data.filter(i => i.inspectionStatus === 'NONE').length);
-
             const days = data.map(i => i.daysVacant).filter(d => d > 0);
             const avg = days.length ? Math.round(days.reduce((a, b) => a + b, 0) / days.length) : 0;
             setTxt('val-avg-days', avg);
