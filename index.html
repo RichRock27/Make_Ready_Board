@@ -534,16 +534,29 @@
     <script>
         let appData = { masterList: [] };
 
+        // Global Error Handler to ensure UI never freezes
+        window.onerror = function (msg, url, line, col, error) {
+            console.error("Global Error:", msg, error);
+            // Emergency overlay removal
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) {
+                overlay.classList.remove('active');
+                overlay.style.display = 'none';
+            }
+            return false;
+        };
+
         document.addEventListener('DOMContentLoaded', () => {
+            console.log("App Initialized");
             loadData();
             setupFilters();
         });
 
         function setupFilters() {
-            // Attach change event to all selects and search
             const ids = ['filter-property', 'filter-ready', 'filter-inspection', 'filter-web', 'filter-net', 'search-input'];
             ids.forEach(id => {
-                document.getElementById(id).addEventListener('input', renderDashboard);
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('input', renderDashboard);
             });
         }
 
@@ -558,41 +571,69 @@
         }
 
         function loadData() {
-            // Show loading UI
+            // 1. Show Loading Overlay
             const overlay = document.getElementById('loading-overlay');
             if (overlay) overlay.classList.add('active');
 
             const icon = document.getElementById('refresh-icon');
             if (icon) icon.classList.add('fa-spin');
 
-            google.script.run
-                .withSuccessHandler(onDataSuccess)
-                .withFailureHandler(onDataFail)
-                .getData();
+            // 2. Safety Valve: Force hide overlay after 10 seconds if backend hangs
+            setTimeout(() => {
+                if (overlay && overlay.classList.contains('active')) {
+                    console.warn("Safety Valve: Hiding overlay due to timeout.");
+                    overlay.classList.remove('active');
+                    if (icon) icon.classList.remove('fa-spin');
+                }
+            }, 10000);
+
+            // 3. Environment Check
+            if (typeof google === 'undefined' || typeof google.script === 'undefined') {
+                console.warn("Google Script Environment NOT found. Running in Local/Demo Mode.");
+                // Simulate network delay then load mock data
+                setTimeout(() => {
+                    const mockData = {
+                        status: 'success',
+                        data: {
+                            vacancies: [
+                                { "Property": "Sunset Apartments", "Unit": "101", "Days Vacant": 5, "Rent Ready": "Yes", "Posted To Website": "Yes", "Posted To Internet": "Yes" },
+                                { "Property": "Sunset Apartments", "Unit": "204", "Days Vacant": 12, "Rent Ready": "No", "Posted To Website": "No", "Posted To Internet": "No" },
+                                { "Property": "Highland Heights", "Unit": "A-5", "Days Vacant": 45, "Rent Ready": "No", "Posted To Website": "Yes", "Posted To Internet": "No" }
+                            ],
+                            moveOuts: [],
+                            inspections: [],
+                            workOrders: [],
+                            timestamp: "Local Demo Mode"
+                        }
+                    };
+                    onDataSuccess(mockData);
+                }, 800);
+                return;
+            }
+
+            // 4. Call Backend
+            try {
+                google.script.run
+                    .withSuccessHandler(onDataSuccess)
+                    .withFailureHandler(onDataFail)
+                    .getData();
+            } catch (e) {
+                console.error("Backend Call Failed:", e);
+                onDataFail(e.toString());
+            }
         }
 
         function onDataFail(err) {
-            const overlay = document.getElementById('loading-overlay');
-            if (overlay) {
-                overlay.classList.remove('active');
-                overlay.style.display = 'none'; // Fallback
-            }
-            alert("Error: " + err);
+            console.error("Data Fail:", err);
+            hideOverlay();
+            alert("Error loading data: " + err);
         }
 
         function onDataSuccess(response) {
-            const overlay = document.getElementById('loading-overlay');
-            if (overlay) {
-                overlay.classList.remove('active');
-                // Force hide just in case CSS class fails
-                overlay.style.display = '';
-            }
+            hideOverlay();
 
-            const icon = document.getElementById('refresh-icon');
-            if (icon) icon.classList.remove('fa-spin');
-
-            if (response.status !== 'success') {
-                alert("Server Error: " + response.message);
+            if (!response || response.status !== 'success') {
+                alert("Server Error: " + (response ? response.message : "Unknown error"));
                 return;
             }
 
@@ -600,92 +641,117 @@
             renderDashboard();
         }
 
+        function hideOverlay() {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) {
+                overlay.classList.remove('active');
+                // Ensure it gets out of the way
+                setTimeout(() => { overlay.style.display = 'none'; }, 200);
+            }
+            const icon = document.getElementById('refresh-icon');
+            if (icon) icon.classList.remove('fa-spin');
+        }
+
         function normalizeUnit(unit) {
             return unit ? unit.toString().trim() : "Unknown";
         }
 
         function processData(rawData) {
+            if (!rawData) return;
             const merged = new Map();
             const getKey = (prop, unit) => `${prop}-${normalizeUnit(unit)}`;
 
+            // Helper to safely parse int
+            const safeInt = (v) => parseInt(v) || 0;
+
             // 1. Vacancy Data
-            rawData.vacancies.forEach(row => {
-                let prop = row['Property Name'] || row['Property'];
-                if (!prop || prop === 'Total') return;
+            if (rawData.vacancies) {
+                rawData.vacancies.forEach(row => {
+                    let prop = row['Property Name'] || row['Property'];
+                    if (!prop || prop === 'Total') return;
 
-                const key = getKey(prop, row['Unit']);
-                merged.set(key, {
-                    key: key,
-                    property: prop,
-                    unit: normalizeUnit(row['Unit']),
-                    daysVacant: parseInt(row['Days Vacant']) || 0,
-                    rentReady: (row['Rent Ready'] === 'Yes'),
-                    postedWeb: (row['Posted To Website'] === 'Yes'),
-                    postedNet: (row['Posted To Internet'] === 'Yes'),
-                    moveOutDate: null,
-                    inspectionStatus: 'NONE',
-                    workOrderStatus: 'NONE',
-                    workOrderEst: ''
-                });
-            });
-
-            // 2. Move Outs (Tickler)
-            rawData.moveOuts.forEach(row => {
-                let prop = row['Property Name'] || row['Property'];
-                if (!prop) return;
-                const key = getKey(prop, row['Unit']);
-
-                if (!merged.has(key)) {
+                    const key = getKey(prop, row['Unit']);
                     merged.set(key, {
-                        key: key, property: prop, unit: normalizeUnit(row['Unit']),
-                        daysVacant: 0, rentReady: false, postedWeb: false, postedNet: false,
-                        moveOutDate: row['Date'] || row['Move Out Date'],
-                        inspectionStatus: 'NONE', workOrderStatus: 'NONE'
+                        key: key,
+                        property: prop,
+                        unit: normalizeUnit(row['Unit']),
+                        daysVacant: safeInt(row['Days Vacant']),
+                        rentReady: (row['Rent Ready'] === 'Yes'),
+                        postedWeb: (row['Posted To Website'] === 'Yes'),
+                        postedNet: (row['Posted To Internet'] === 'Yes'),
+                        moveOutDate: null,
+                        inspectionStatus: 'NONE',
+                        workOrderStatus: 'NONE',
+                        workOrderEst: ''
                     });
-                } else {
-                    merged.get(key).moveOutDate = row['Date'] || row['Move Out Date'];
-                }
-            });
+                });
+            }
+
+            // 2. Move Outs
+            if (rawData.moveOuts) {
+                rawData.moveOuts.forEach(row => {
+                    let prop = row['Property Name'] || row['Property'];
+                    if (!prop) return;
+                    const key = getKey(prop, row['Unit']);
+
+                    if (!merged.has(key)) {
+                        merged.set(key, {
+                            key: key, property: prop, unit: normalizeUnit(row['Unit']),
+                            daysVacant: 0, rentReady: false, postedWeb: false, postedNet: false,
+                            moveOutDate: row['Date'] || row['Move Out Date'],
+                            inspectionStatus: 'NONE', workOrderStatus: 'NONE'
+                        });
+                    } else {
+                        merged.get(key).moveOutDate = row['Date'] || row['Move Out Date'];
+                    }
+                });
+            }
 
             // 3. Inspections
-            rawData.inspections.forEach(row => {
-                let prop = row['Property Name'] || row['Property'];
-                if (!prop) return;
-                const key = getKey(prop, row['Unit']);
-                const status = (row['Status'] || 'NEW').toUpperCase();
+            if (rawData.inspections) {
+                rawData.inspections.forEach(row => {
+                    let prop = row['Property Name'] || row['Property'];
+                    if (!prop) return;
+                    const key = getKey(prop, row['Unit']);
+                    const status = (row['Status'] || 'NEW').toUpperCase();
 
-                if (merged.has(key)) {
-                    const item = merged.get(key);
-                    if (item.inspectionStatus === 'NONE' || status !== 'DONE') {
-                        item.inspectionStatus = status;
+                    if (merged.has(key)) {
+                        const item = merged.get(key);
+                        if (item.inspectionStatus === 'NONE' || status !== 'DONE') {
+                            item.inspectionStatus = status;
+                        }
                     }
-                }
-            });
+                });
+            }
 
             // 4. Work Orders
-            rawData.workOrders.forEach(row => {
-                let prop = row['Property Name'] || row['Property'];
-                if (!prop) return;
-                const key = getKey(prop, row['Unit']);
-                const status = row['Status'];
+            if (rawData.workOrders) {
+                rawData.workOrders.forEach(row => {
+                    let prop = row['Property Name'] || row['Property'];
+                    if (!prop) return;
+                    const key = getKey(prop, row['Unit']);
+                    const status = row['Status'];
 
-                if (merged.has(key) && status && status !== 'Closed' && status !== 'Cancelled') {
-                    merged.get(key).workOrderStatus = status;
-                    merged.get(key).workOrderEst = row['Estimate Amount'];
-                }
-            });
+                    if (merged.has(key) && status && status !== 'Closed' && status !== 'Cancelled') {
+                        merged.get(key).workOrderStatus = status;
+                        merged.get(key).workOrderEst = row['Estimate Amount'];
+                    }
+                });
+            }
 
             appData.masterList = Array.from(merged.values());
             appData.masterList.sort((a, b) => b.daysVacant - a.daysVacant);
 
-            document.getElementById('last-updated-date').innerText = rawData.timestamp || new Date().toLocaleString();
+            const dateSpan = document.getElementById('last-updated-date');
+            if (dateSpan) dateSpan.innerText = rawData.timestamp || new Date().toLocaleString();
+
             populatePropertyFilter();
         }
 
         function populatePropertyFilter() {
             const select = document.getElementById('filter-property');
+            if (!select) return;
             const current = select.value;
-            // Get unique properties
             const props = [...new Set(appData.masterList.map(i => i.property))].sort();
 
             select.innerHTML = '<option value="all">All Properties</option>';
@@ -700,31 +766,31 @@
 
         function renderDashboard() {
             const tableBody = document.getElementById('table-body');
+            if (!tableBody) return;
             tableBody.innerHTML = '';
 
-            // Get Filer Values
-            const fProp = document.getElementById('filter-property').value;
-            const fReady = document.getElementById('filter-ready').value;
-            const fInsp = document.getElementById('filter-inspection').value;
-            const fWeb = document.getElementById('filter-web').value;
-            const fNet = document.getElementById('filter-net').value;
-            const fSearch = document.getElementById('search-input').value.toLowerCase();
+            const getVal = (id) => {
+                const el = document.getElementById(id);
+                return el ? el.value : 'all';
+            };
 
-            // Filter Data
+            const fProp = getVal('filter-property');
+            const fReady = getVal('filter-ready');
+            const fInsp = getVal('filter-inspection');
+            const fWeb = getVal('filter-web');
+            const fNet = getVal('filter-net');
+            const searchEl = document.getElementById('search-input');
+            const fSearch = searchEl ? searchEl.value.toLowerCase() : '';
+
             const filtered = appData.masterList.filter(item => {
                 if (fProp !== 'all' && item.property !== fProp) return false;
-
                 if (fReady === 'Yes' && !item.rentReady) return false;
                 if (fReady === 'No' && item.rentReady) return false;
-
                 if (fInsp !== 'all' && item.inspectionStatus !== fInsp) return false;
-
                 if (fWeb === 'Yes' && !item.postedWeb) return false;
                 if (fWeb === 'No' && item.postedWeb) return false;
-
                 if (fNet === 'Yes' && !item.postedNet) return false;
                 if (fNet === 'No' && item.postedNet) return false;
-
                 if (fSearch) {
                     const text = `${item.property} ${item.unit}`.toLowerCase();
                     if (!text.includes(fSearch)) return false;
@@ -732,14 +798,11 @@
                 return true;
             });
 
-            // Update Stats
             updateStats(filtered);
 
-            // Render Table
             filtered.forEach(item => {
                 const tr = document.createElement('tr');
 
-                // Badges
                 let inspBadgeClass = 'badge-none';
                 if (item.inspectionStatus === 'NEW') inspBadgeClass = 'badge-new';
                 else if (item.inspectionStatus === 'IN PROGRESS') inspBadgeClass = 'badge-progress';
@@ -782,13 +845,17 @@
         }
 
         function updateStats(data) {
-            document.getElementById('val-vacant').innerText = data.length;
-            document.getElementById('val-not-ready').innerText = data.filter(i => !i.rentReady).length;
-            document.getElementById('val-no-insp').innerText = data.filter(i => i.inspectionStatus === 'NONE').length;
+            const setTxt = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.innerText = val;
+            };
+            setTxt('val-vacant', data.length);
+            setTxt('val-not-ready', data.filter(i => !i.rentReady).length);
+            setTxt('val-no-insp', data.filter(i => i.inspectionStatus === 'NONE').length);
 
             const days = data.map(i => i.daysVacant).filter(d => d > 0);
             const avg = days.length ? Math.round(days.reduce((a, b) => a + b, 0) / days.length) : 0;
-            document.getElementById('val-avg-days').innerText = avg;
+            setTxt('val-avg-days', avg);
         }
     </script>
 </body>
