@@ -598,21 +598,23 @@
 
             const data = response.data;
             // Check if we actually got data
+
+            // ALWAYS Show Debug on Screen (User Request to Verify Logic)
+            if (data.debug) {
+                const debugEl = document.getElementById('debug-log');
+                const debugCont = document.getElementById('debug-container');
+                if (debugEl && debugCont) {
+                    debugEl.textContent = Array.isArray(data.debug) ? data.debug.join('\n') : data.debug;
+                    debugCont.style.display = 'block';
+                }
+                console.log("Server Debug:", data.debug);
+            }
+
+            // Check if we actually got data
             const totalItems = (data.moveOuts?.length || 0) + (data.vacancies?.length || 0);
             if (totalItems === 0) {
                 console.warn("No data returned from server.");
                 let msg = "No relevant data found in the last 5 days of emails. See Debug Log on screen.";
-
-                // Show Debug on Screen
-                if (data.debug) {
-                    const debugEl = document.getElementById('debug-log');
-                    const debugCont = document.getElementById('debug-container');
-                    if (debugEl && debugCont) {
-                        debugEl.textContent = Array.isArray(data.debug) ? data.debug.join('\n') : data.debug;
-                        debugCont.style.display = 'block';
-                    }
-                    console.log("Server Debug:", data.debug);
-                }
                 alert(msg);
             }
 
