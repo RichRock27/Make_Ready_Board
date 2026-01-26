@@ -61,7 +61,16 @@ var GmailFetcher = {
             if (lowerName.includes('vacancy')) currentType = "VACANCY";
             else if (lowerName.includes('move not') || lowerName.includes('move-out') || lowerName.includes('move out') || lowerName.includes('tickler')) currentType = "MOVEOUT";
             else if (lowerName.includes('inspection')) currentType = "INSPECTION";
-            else if (lowerName.includes('work order')) currentType = "WORKORDER";
+            else if (lowerName.includes('work order') || lowerName.includes('work_order')) currentType = "WORKORDER";
+
+            // Fallback: If filename is ambiguous, check the Subject Line
+            if (currentType === "UNKNOWN") {
+                var lowerSubject = subject.toLowerCase();
+                if (lowerSubject.includes('vacancy')) currentType = "VACANCY";
+                else if (lowerSubject.includes('tickler') || lowerSubject.includes('move out')) currentType = "MOVEOUT";
+                else if (lowerSubject.includes('inspection')) currentType = "INSPECTION";
+                else if (lowerSubject.includes('work order')) currentType = "WORKORDER";
+            }
 
             // CHECK IF WE SHOULD PROCESS THIS FILE
             // We want to aggregate ALL relevant files:
