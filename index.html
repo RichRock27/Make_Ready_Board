@@ -648,30 +648,45 @@
         }
 
         function processData(rawData) {
+            console.log("Processing Data...", rawData);
             if (!rawData) return;
             const merged = new Map();
             const safeInt = (v) => parseInt(v) || 0;
 
+            // HELPER: Fuzzy match column names (handles "Property Name " vs "Property Name")
+            const getCol = (row, colName) => {
+                if (!row) return "";
+                const cleanName = colName.toLowerCase().trim();
+                // 1. Direct match first
+                if (row[colName] !== undefined) return row[colName];
+
+                // 2. Scan keys
+                const keys = Object.keys(row);
+                for (let k of keys) {
+                    if (k.toLowerCase().trim() === cleanName) return row[k];
+                }
+                return "";
+            };
+
             // 1. BASE: VACANCIES (The "Truth")
             if (rawData.vacancies) {
                 rawData.vacancies.forEach(row => {
-                    // TRUST: 'Property Name' is the ID (e.g. 14PEA1720)
-                    const prop = row['Property Name'];
+                    const prop = getCol(row, 'Property Name');
                     if (!prop || prop === 'Total') return;
 
-                    const unit = row['Unit'];
+                    const unit = getCol(row, 'Unit');
                     const key = getKey(prop, unit);
 
                     merged.set(key, {
                         key: key,
-                        property: prop, // Display Name AND ID are the same
+                        property: prop,
                         territory: deriveTerritory(prop),
                         unit: normalizeUnit(unit),
-                        daysVacant: safeInt(row['Days Vacant']),
-                        rentReady: (row['Rent Ready'] || '').toLowerCase() === 'yes',
-                        postedWeb: (row['Posted To Website'] || '').toLowerCase() === 'yes',
-                        postedNet: (row['Posted To Internet'] || '').toLowerCase() === 'yes',
-                        // Placeholders to be filled
+                        daysVacant: safeInt(getCol(row, 'Days Vacant')),
+                        rentReady: (getCol(row, 'Rent Ready') || '').toLowerCase() === 'yes',
+                        postedWeb: (getCol(row, 'Posted To Website') || '').toLowerCase() === 'yes',
+                        postedNet: (getCol(row, 'Posted To Internet') || '').toLowerCase() === 'yes',
+                        // Placeholders
                         moveOutDate: null,
                         inspectionStatus: 'NONE',
                         workOrderStatus: 'NONE',
@@ -683,17 +698,17 @@
             // 2. ENRICH: MOVE OUTS
             if (rawData.moveOuts) {
                 rawData.moveOuts.forEach(row => {
-                    const prop = row['Property Name'];
+                    const prop = getCol(row, 'Property Name');
                     if (!prop) return;
 
-                    const unit = row['Unit'];
+                    const unit = getCol(row, 'Unit');
                     const key = getKey(prop, unit);
-                    const mDate = row['Move Out Date'] || row['Move-out Date'];
+                    const mDate = getCol(row, 'Move Out Date') || getCol(row, 'Move-out Date');
 
                     if (merged.has(key)) {
                         merged.get(key).moveOutDate = mDate;
                     } else {
-                        // Orphaned Move Out (Not currently vacant? Still show it)
+                        // Orphaned Move Out
                         merged.set(key, {
                             key: key,
                             property: prop,
@@ -714,15 +729,15 @@
             // 3. ENRICH: INSPECTIONS
             if (rawData.inspections) {
                 rawData.inspections.forEach(row => {
-                    const prop = row['Property Name'];
+                    const prop = getCol(row, 'Property Name');
                     if (!prop) return;
 
-                    const key = getKey(prop, row['Unit']);
-                    const status = (row['Status'] || 'NEW').toUpperCase();
+                    const key = getKey(prop, getCol(row, 'Unit'));
+                    // Default to NEW if status is missing but row exists
+                    const status = (getCol(row, 'Status') || 'NEW').toUpperCase();
 
                     if (merged.has(key)) {
                         const item = merged.get(key);
-                        // Prioritize relevant statuses
                         if (item.inspectionStatus === 'NONE' || status !== 'DONE') {
                             item.inspectionStatus = status;
                         }
@@ -733,23 +748,21 @@
             // 4. ENRICH: WORK ORDERS
             if (rawData.workOrders) {
                 rawData.workOrders.forEach(row => {
-                    // Work Orders might call it 'Property Name' OR 'Property' (if just the ID)
-                    // Based on CSV, 'Property Name' is safer if available, but let's check.
-                    // The CSV view showed 'Property Name' is valid in the WO csv too.
-                    const prop = row['Property Name'] || row['Property'];
+                    const prop = getCol(row, 'Property Name');
                     if (!prop) return;
 
-                    const key = getKey(prop, row['Unit']);
-                    const status = row['Status'];
+                    const key = getKey(prop, getCol(row, 'Unit'));
+                    const status = getCol(row, 'Status');
 
                     if (merged.has(key) && status && status !== 'Closed' && status !== 'Cancelled') {
                         merged.get(key).workOrderStatus = status;
-                        merged.get(key).workOrderEst = row['Estimate Amount'] || row['Estimate'];
+                        merged.get(key).workOrderEst = getCol(row, 'Estimate Amount');
                     }
                 });
             }
 
             appData.masterList = Array.from(merged.values());
+            console.log("Merged Data Points:", appData.masterList.length);
             appData.masterList.sort((a, b) => b.daysVacant - a.daysVacant);
 
             const dateSpan = document.getElementById('last-updated-date');
