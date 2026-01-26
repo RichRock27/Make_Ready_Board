@@ -686,9 +686,12 @@
                 logToScreen(`Row 0 'Property Name' check: '${getCol(first, 'Property Name')}'`);
 
 
-                rawData.vacancies.forEach(row => {
-                    const prop = getCol(row, 'Property Name');
-                    if (!prop || prop === 'Total') return;
+                rawData.vacancies.forEach((row, idx) => {
+                    const prop = getCol(row, 'Property Name') || getCol(row, 'Property') || getCol(row, 'Property ID');
+                    if (!prop || prop === 'Total') {
+                        if (idx < 5) logToScreen(`Skipping Row ${idx}: No Property Name found. (Val: '${prop}')`);
+                        return;
+                    }
 
                     const unit = getCol(row, 'Unit');
                     const key = getKey(prop, unit);
