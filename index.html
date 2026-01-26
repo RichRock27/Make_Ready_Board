@@ -618,6 +618,21 @@
 
         function normalizeUnit(unit) { return unit ? unit.toString().trim() : "Unknown"; }
 
+        function deriveTerritory(propCode) {
+            if (!propCode || propCode.length < 2) return 'Other';
+            const prefix = propCode.substring(0, 2);
+            switch (prefix) {
+                case '11': return 'Commercial';
+                case '12': return 'COS';
+                case '13': return 'Aurora';
+                case '14': return 'Denver Central';
+                case '16': return 'OKC';
+                case '17': return 'Fitz';
+                case '18': return 'GLVV';
+                default: return 'Other';
+            }
+        }
+
         function processData(rawData) {
             if (!rawData) return;
             const merged = new Map();
@@ -632,7 +647,7 @@
                     merged.set(key, {
                         key: key,
                         property: prop,
-                        territory: row['Territory'] || 'Unknown', // Parse Territory
+                        territory: deriveTerritory(prop),
                         unit: normalizeUnit(row['Unit']),
                         daysVacant: safeInt(row['Days Vacant']),
                         rentReady: (row['Rent Ready'] === 'Yes'),
@@ -650,7 +665,9 @@
                     const key = getKey(prop, row['Unit']);
                     if (!merged.has(key)) {
                         merged.set(key, {
-                            key: key, property: prop, unit: normalizeUnit(row['Unit']),
+                            key: key, property: prop,
+                            territory: deriveTerritory(prop),
+                            unit: normalizeUnit(row['Unit']),
                             daysVacant: 0, rentReady: false, postedWeb: false, postedNet: false,
                             moveOutDate: row['Date'] || row['Move Out Date'], inspectionStatus: 'NONE', workOrderStatus: 'NONE'
                         });
