@@ -492,10 +492,12 @@
                             <tr>
                                 <th>Property</th>
                                 <th>Unit</th>
+                                <th>Bed/Bath</th>
                                 <th>Move Out</th>
                                 <th>Days Vacant</th>
                                 <th>Inspection</th>
                                 <th>Work Order</th>
+                                <th>Est. Status</th>
                                 <th>Rent Ready?</th>
                                 <th>Marketing</th>
                                 <th>Actions</th>
@@ -712,7 +714,18 @@
                             moveOutDate: null,
                             inspectionStatus: 'NONE',
                             workOrderStatus: 'NONE',
-                            workOrderEst: ''
+                            unit: normalizeUnit(unit),
+                            bedBath: parseFloat(getCol(row, 'Bed/Bath')) || '-', // Parse float to remove trailing zeros
+                            daysVacant: safeInt(getCol(row, 'Days Vacant')),
+                            rentReady: (getCol(row, 'Rent Ready') || '').toLowerCase() === 'yes',
+                            postedWeb: (getCol(row, 'Posted To Website') || '').toLowerCase() === 'yes',
+                            postedNet: (getCol(row, 'Posted To Internet') || '').toLowerCase() === 'yes',
+                            // Placeholders
+                            moveOutDate: null,
+                            inspectionStatus: 'NONE',
+                            workOrderStatus: 'NONE',
+                            workOrderEst: '',
+                            estApprovalStatus: '-'
                         });
                         successCount++;
                     } catch (err) {
@@ -783,7 +796,9 @@
 
                     if (merged.has(key) && status && status !== 'Closed' && status !== 'Cancelled') {
                         merged.get(key).workOrderStatus = status;
+                        merged.get(key).workOrderStatus = status;
                         merged.get(key).workOrderEst = getCol(row, 'Estimate Amount');
+                        merged.get(key).estApprovalStatus = getCol(row, 'Estimate Approval Status') || '-';
                     }
                 });
             }
@@ -897,10 +912,12 @@
                 tr.innerHTML = `
                     <td><strong>${item.property}</strong></td>
                     <td>${item.unit}</td>
+                    <td>${item.bedBath}</td>
                     <td>${item.moveOutDate || '-'}</td>
                     <td>${item.daysVacant}</td>
                     <td><span class="badge ${inspBadgeClass}">${item.inspectionStatus}</span></td>
                     <td>${woHtml}</td>
+                    <td><span class="badge badge-none">${item.estApprovalStatus}</span></td>
                     <td><div style="display:flex;align-items:center;"><span class="status-dot ${item.rentReady ? 'green' : 'red'}"></span>${item.rentReady ? 'Yes' : 'No'}</div></td>
                     <td style="${alertStyle}"><div style="display:flex;gap:4px;"><span class="badge ${item.postedWeb ? 'badge-new' : 'badge-none'}">WEB</span><span class="badge ${item.postedNet ? 'badge-new' : 'badge-none'}">NET</span></div></td>
                 `;
