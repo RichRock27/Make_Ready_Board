@@ -6,7 +6,8 @@ var GmailFetcher = {
     try {
       // 1. SEARCH PHASE
       // Updated to match both "MRB Daily Reports" and manual "MRB - Type" emails
-      var query = 'subject:("MRB Daily Reports" OR "MRB - ") has:attachment newer_than:5d';
+      // EXTENDED WINDOW to 30d to ensure data is found even if emails are a few days old
+      var query = 'subject:("MRB Daily Reports" OR "MRB - ") has:attachment newer_than:30d';
       debugLog.push("[1] Searching Gmail...");
       debugLog.push("    -> Query: [" + query + "]");
       

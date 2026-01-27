@@ -605,7 +605,7 @@
                 const debugCont = document.getElementById('debug-container');
                 if (debugEl && debugCont) {
                     debugEl.textContent = Array.isArray(data.debug) ? data.debug.join('\n') : data.debug;
-                    debugCont.style.display = 'block';
+                    // debugCont.style.display = 'block'; // HIDDEN BY DEFAULT NOW
                 }
                 console.log("Server Debug:", data.debug);
             }
@@ -799,7 +799,49 @@
             populatePropertyFilter();
         }
 
-        // ... (populateTerritoryFilter/populatePropertyFilter stay same) ...
+        function populateTerritoryFilter() {
+            const select = document.getElementById('filter-territory');
+            if (!select) return;
+            // distinct territories
+            const territories = [...new Set(appData.masterList.map(i => i.territory))].sort();
+            const curr = select.value;
+
+            select.innerHTML = '<option value="all">All Territories</option>';
+            territories.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t;
+                opt.innerText = t;
+                select.appendChild(opt);
+            });
+            // restore if valid
+            if (territories.includes(curr)) select.value = curr;
+        }
+
+        function populatePropertyFilter() {
+            const select = document.getElementById('filter-property');
+            const terrSelect = document.getElementById('filter-territory');
+            if (!select) return;
+
+            const terrVal = terrSelect ? terrSelect.value : 'all';
+            const curr = select.value;
+
+            let list = appData.masterList;
+            if (terrVal !== 'all') {
+                list = list.filter(i => i.territory === terrVal);
+            }
+
+            const props = [...new Set(list.map(i => i.property))].sort();
+
+            select.innerHTML = '<option value="all">All Properties</option>';
+            props.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p;
+                opt.innerText = p;
+                select.appendChild(opt);
+            });
+
+            if (props.includes(curr)) select.value = curr;
+        }
 
         function renderDashboard() {
             if (!appData.masterList) appData.masterList = [];
