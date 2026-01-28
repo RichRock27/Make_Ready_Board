@@ -1,7 +1,3 @@
-# Ignore local scripts and data
-inspect_workorder.js
-simulate_parsing.js
-*.csv
-.git
-node_modules
-.DS_Store
+_BACKUPS/**
+.git/**
+README.md
