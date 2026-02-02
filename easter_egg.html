@@ -1,0 +1,230 @@
+<style>
+    #rrww-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: #000;
+        z-index: 10000;
+        display: none;
+        opacity: 0;
+        transition: opacity 0.5s;
+        perspective: 1000px;
+        overflow: hidden;
+    }
+
+    .matrix-canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0.3;
+    }
+
+    .rrww-container {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: flex;
+        gap: 2rem;
+        z-index: 10001;
+    }
+
+    .letter {
+        font-family: 'Arial Black', sans-serif;
+        font-size: 8rem;
+        color: transparent;
+        -webkit-text-stroke: 4px #0ea5e9;
+        position: relative;
+        transform-style: preserve-3d;
+        opacity: 0;
+    }
+
+    .letter.reveal {
+        animation: reveal3D 3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .letter::before {
+        content: attr(data-char);
+        position: absolute;
+        top: 0;
+        left: 0;
+        color: #0ea5e9;
+        text-shadow: 0 0 20px #0ea5e9, 0 0 40px #0ea5e9;
+        opacity: 0;
+        transform: translateZ(-10px);
+        filter: blur(10px);
+    }
+
+    .letter.reveal::before {
+        animation: glowPulse 2s ease-in-out infinite alternate;
+        opacity: 0.6;
+    }
+
+    @keyframes reveal3D {
+        0% {
+            transform: rotateX(90deg) translateY(100px);
+            opacity: 0;
+        }
+
+        20% {
+            opacity: 1;
+        }
+
+        100% {
+            transform: rotateX(0deg) translateY(0);
+            opacity: 1;
+        }
+    }
+
+    @keyframes glowPulse {
+        0% {
+            text-shadow: 0 0 20px #0ea5e9, 0 0 40px #3b82f6;
+            opacity: 0.4;
+        }
+
+        100% {
+            text-shadow: 0 0 40px #0ea5e9, 0 0 80px #3b82f6, 0 0 100px #fff;
+            opacity: 0.8;
+        }
+    }
+
+    .shockwave {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        border: 20px solid #fff;
+        transform: translate(-50%, -50%);
+        opacity: 0;
+        z-index: 9999;
+    }
+
+    .shockwave.boom {
+        animation: shockwaveAnim 0.8s ease-out forwards;
+    }
+
+    @keyframes shockwaveAnim {
+        0% {
+            width: 0;
+            height: 0;
+            opacity: 1;
+            border-width: 50px;
+        }
+
+        100% {
+            width: 150vw;
+            height: 150vw;
+            opacity: 0;
+            border-width: 0;
+        }
+    }
+</style>
+
+<div id="rrww-overlay">
+    <canvas id="matrix-bg" class="matrix-canvas"></canvas>
+    <div class="rrww-container">
+        <div class="letter" data-char="R">R</div>
+        <div class="letter" data-char="R">R</div>
+        <div class="letter" data-char="W">W</div>
+        <div class="letter" data-char="W">W</div>
+    </div>
+    <div class="shockwave" id="shockwave"></div>
+</div>
+
+<script>
+    (function () {
+        let keySeq = [];
+        let eggTimer = null;
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'Control') {
+                keySeq.push('Control');
+                if (eggTimer) clearTimeout(eggTimer);
+                eggTimer = setTimeout(() => { keySeq = []; }, 1000);
+                if (keySeq.length === 4) {
+                    runCinematicSequence();
+                    keySeq = [];
+                }
+            } else {
+                keySeq = [];
+            }
+        });
+
+        function runCinematicSequence() {
+            const overlay = document.getElementById('rrww-overlay');
+            overlay.style.display = 'block';
+
+            // 1. Fade In Overlay
+            setTimeout(() => { overlay.style.opacity = '1'; }, 10);
+
+            // 2. Start Matrix Rain
+            const canvas = document.getElementById('matrix-bg');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const chars = "XYZ010101RRWW";
+            const drops = Array(Math.floor(canvas.width / 20)).fill(1);
+
+            let matrixInterval = setInterval(() => {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#0ea5e9'; // Blue theme
+                ctx.font = '15px monospace';
+
+                for (let i = 0; i < drops.length; i++) {
+                    const text = chars[Math.floor(Math.random() * chars.length)];
+                    ctx.fillText(text, i * 20, drops[i] * 20);
+                    if (drops[i] * 20 > canvas.height && Math.random() > 0.975) drops[i] = 0;
+                    drops[i]++;
+                }
+            }, 50);
+
+            // 3. Reveal Letters Sequentially
+            const letters = document.querySelectorAll('.letter');
+            letters.forEach(l => l.classList.remove('reveal'));
+
+            setTimeout(() => {
+                let delay = 0;
+                letters.forEach((l, i) => {
+                    setTimeout(() => l.classList.add('reveal'), delay);
+                    delay += 200;
+                });
+            }, 800);
+
+            // 4. Climax & Exit
+            setTimeout(() => {
+                // Shockwave
+                document.getElementById('shockwave').classList.add('boom');
+                clearInterval(matrixInterval);
+
+                // Letters fly away
+                letters.forEach(l => {
+                    l.style.transition = 'all 0.5s ease-in';
+                    l.style.transform = `translateZ(500px) rotate(${Math.random() * 360}deg)`;
+                    l.style.opacity = '0';
+                });
+
+                setTimeout(() => {
+                    overlay.style.opacity = '0';
+                    setTimeout(() => {
+                        overlay.style.display = 'none';
+                        document.getElementById('shockwave').classList.remove('boom');
+                        letters.forEach(l => {
+                            l.classList.remove('reveal');
+                            l.style.transform = '';
+                            l.style.opacity = '0';
+                        });
+                    }, 500);
+                }, 600);
+
+            }, 4000);
+        }
+    })();
+</script>

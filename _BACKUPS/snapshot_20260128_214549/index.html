@@ -461,6 +461,44 @@
             font-size: 13px;
             color: var(--text-secondary);
         }
+
+        /* RRWW EASTER EGG */
+        #hidden-logo {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 5rem;
+            font-weight: 900;
+            color: #f1f5f9;
+            text-shadow: 0 0 15px #3b82f6, 0 0 30px #3b82f6;
+            z-index: 9999;
+            pointer-events: none;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+        }
+
+        .particle {
+            position: fixed;
+            background: #fff;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 10000;
+            animation: explode 1.2s ease-out forwards;
+        }
+
+        @keyframes explode {
+            0% {
+                transform: translate(0, 0) scale(1.5);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translate(var(--tx), var(--ty)) scale(0);
+                opacity: 0;
+            }
+        }
     </style>
 </head>
 
@@ -616,9 +654,6 @@
                     </div>
                     <div class="actions">
                         <input type="text" id="search-input" placeholder="Search Property or Unit...">
-                        <button class="btn-refresh" onclick="syncBrain()" style="background: #8b5cf6;">
-                            <i class="fa-solid fa-brain"></i> Sync Brain
-                        </button>
                         <button class="btn-refresh" onclick="loadData()"><i class="fa-solid fa-rotate"
                                 id="refresh-icon"></i> Refresh Data</button>
                     </div>
@@ -647,7 +682,7 @@
         </main>
     </div>
 
-
+    <div id="hidden-logo">RRWW</div>
 
     <script>
         let appData = { masterList: [], hidden: new Set() };
@@ -861,9 +896,6 @@
 
             processData(response.data);
             renderDashboard();
-
-            // Auto-sync to Brain after data loads
-            autoSyncBrain();
         }
 
         function normalizeUnit(unit) { return unit ? unit.toString().trim() : "Unknown"; }
@@ -1268,46 +1300,42 @@
             const avg = days.length ? Math.round(days.reduce((a, b) => a + b, 0) / days.length) : 0;
             setTxt('val-avg-days', avg);
         }
-
-        function syncBrain() {
-            const btn = event.currentTarget || document.querySelector('button[onclick="syncBrain()"]');
-            const originalHTML = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Syncing...';
-            btn.disabled = true;
-
-            google.script.run
-                .withSuccessHandler(res => {
-                    alert("Brain Sync: " + res);
-                    btn.innerHTML = '<i class="fa-solid fa-check"></i> Done';
-                    setTimeout(() => {
-                        btn.innerHTML = originalHTML;
-                        btn.disabled = false;
-                    }, 3000);
-                })
-                .withFailureHandler(err => {
-                    alert("Sync Failed: " + err);
-                    btn.innerHTML = 'Error';
-                    btn.disabled = false;
-                })
-                .syncToBrain();
-        }
-
-        // Auto-sync function (silent, runs in background)
-        function autoSyncBrain() {
-            console.log("Auto-syncing to Brain...");
-            google.script.run
-                .withSuccessHandler(res => {
-                    console.log("Brain auto-sync complete:", res);
-                })
-                .withFailureHandler(err => {
-                    console.warn("Brain auto-sync failed (non-critical):", err);
-                })
-                .syncToBrain();
-        }
+        // RRWW Easter Egg Logic
+        (function () {
+            let keySeq = []; let eggTimer = null;
+            document.addEventListener('keyup', (e) => {
+                // Allow Control, Meta (Command on Mac), or Shift
+                if (['Control', 'Meta', 'Shift'].includes(e.key)) {
+                    keySeq.push(e.key);
+                    // console.log('Egg Key:', e.key, keySeq.length);
+                    if (eggTimer) clearTimeout(eggTimer);
+                    eggTimer = setTimeout(() => { keySeq = []; }, 1000);
+                    if (keySeq.length === 4) { showEasterEgg(); keySeq = []; }
+                } else {
+                    keySeq = [];
+                }
+            });
+            function showEasterEgg() {
+                const logo = document.getElementById('hidden-logo'); if (!logo) return;
+                logo.style.display = 'block'; logo.style.opacity = '1';
+                setTimeout(() => {
+                    const rect = logo.getBoundingClientRect(); const cx = rect.left + rect.width / 2; const cy = rect.top + rect.height / 2;
+                    for (let i = 0; i < 80; i++) {
+                        const p = document.createElement('div'); p.classList.add('particle');
+                        const angle = Math.random() * Math.PI * 2; const dist = 150 + Math.random() * 250;
+                        const tx = Math.cos(angle) * dist; const ty = Math.sin(angle) * dist;
+                        p.style.setProperty('--tx', tx + 'px'); p.style.setProperty('--ty', ty + 'px');
+                        p.style.left = cx + 'px'; p.style.top = cy + 'px';
+                        p.style.width = (4 + Math.random() * 8) + 'px'; p.style.height = p.style.width;
+                        const colors = ['#3b82f6', '#8b5cf6', '#fff', '#0ea5e9'];
+                        p.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                        document.body.appendChild(p); setTimeout(() => p.remove(), 1200);
+                    }
+                    logo.style.display = 'none';
+                }, 2000);
+            }
+        })();
     </script>
-
-    <?!= include('easter_egg'); ?>
-
 </body>
 
 </html>
