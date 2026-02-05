@@ -1,33 +1,17 @@
 var GmailFetcher = {
+  /**
+   * DATA HUB FETCHER (Previously GmailFetcher)
+   * Connects to the Central Data Hub (Shared Drive Folder) to retrieve standardized reports.
+   * This eliminates the need for MRB to scan emails directly.
+   */
   getLatestReportData: function() {
+    var HUB_FOLDER_ID = "13f-KJPJ5mzHkrE5_JU16dc62gv3WEzQN"; // The PMD/Central Hub Folder
     var debugLog = [];
-    debugLog.push("=== START DEBUG LOG (MAX VERBOSITY) ===");
+    debugLog.push("=== START DATA HUB FETCH ===");
+    debugLog.push("Connecting to Shared Folder: " + HUB_FOLDER_ID);
 
     try {
-      // 1. SEARCH PHASE
-      // Updated to match both "MRB Daily Reports" and manual "MRB - Type" emails
-      // EXTENDED WINDOW to 30d to ensure data is found even if emails are a few days old
-      var query = 'subject:("MRB Daily Reports" OR "MRB - ") has:attachment newer_than:7d';
-      debugLog.push("[1] Searching Gmail...");
-      debugLog.push("    -> Query: [" + query + "]");
-      
-      // Fetch up to 50 threads to ensure we catch the latest among many emails
-      var threads = GmailApp.search(query, 0, 50);
-      debugLog.push("    -> Threads Found: " + threads.length);
-
-      if (threads.length === 0) {
-        debugLog.push("    -> ERROR: No emails found matching the query.");
-        return { vacancies: [], moveOuts: [], inspections: [], workOrders: [], timestamp: "No Data", debug: debugLog };
-      }
-
-      // flags to ensure we only take the NEWEST of each type
-      var foundTypes = {
-          VACANCY: false,
-          MOVEOUT: false,
-          INSPECTION: false,
-          WORKORDER: false
-      };
-
+      var folder = DriveApp.getFolderById(HUB_FOLDER_ID);
       var rawData = {
         vacancies: [],
         moveOuts: [],
@@ -35,113 +19,61 @@ var GmailFetcher = {
         workOrders: []
       };
 
-      // 2. ITERATE ALL THREADS TO COLLECT ATTACHMENTS
-      // GmailApp.search returns newest first. We iterate in order.
-      debugLog.push("[2] Scanning Threads & Attachments (Newest First)...");
-      
-      for (var i = 0; i < threads.length; i++) {
-        var thread = threads[i];
-        var messages = thread.getMessages();
-        // The last message in the thread is the newest one in that conversation
-        var msg = messages[messages.length - 1]; 
-        var subject = msg.getSubject();
-        var date = msg.getDate();
+      // Configuration: Map MRB Data Types to Hub Files (Priority 1 = CORE, Priority 2 = Legacy)
+      var fileMap = [
+        { type: "vaccancy",   core: "CORE_Vacancy.csv",      legacy: "Vacancies.csv",        target: "vacancies" },
+        { type: "moveout",    core: "CORE_MoveOuts.csv",     legacy: "TenantMovement.csv",   target: "moveOuts" },
+        { type: "inspection", core: "CORE_Inspections.csv",  legacy: "Inspections_Raw.csv",  target: "inspections" }, // Legacy might not exist
+        { type: "workorder",  core: "CORE_WorkOrders.csv",   legacy: "WorkOrders_Raw.csv",   target: "workOrders" }
+      ];
 
-        debugLog.push("    -> Thread [" + i + "]: Subject='" + subject + "', Date=" + date);
+      for (var i = 0; i < fileMap.length; i++) {
+          var config = fileMap[i];
+          var file = null;
+          var sourceName = "";
 
-        var attachments = msg.getAttachments();
-        debugLog.push("       -> Attachment Count: " + attachments.length);
+          // 1. Try CORE (New Standard)
+          var coreFiles = folder.getFilesByName(config.core);
+          if (coreFiles.hasNext()) {
+              file = coreFiles.next();
+              sourceName = config.core;
+          } 
+          // 2. Try LEGACY (Fallback)
+          else {
+              var legacyFiles = folder.getFilesByName(config.legacy);
+              if (legacyFiles.hasNext()) {
+                  file = legacyFiles.next();
+                  sourceName = config.legacy;
+              }
+          }
 
-        for (var j = 0; j < attachments.length; j++) {
-            var att = attachments[j];
-            var name = att.getName();
-            var lowerName = name.toLowerCase();
-
-            // IDENTIFY TYPE BEFORE PARSING
-            var currentType = "UNKNOWN";
-            if (lowerName.includes('vacancy')) currentType = "VACANCY";
-            else if (lowerName.includes('move not') || lowerName.includes('move-out') || lowerName.includes('move out') || lowerName.includes('tickler')) currentType = "MOVEOUT";
-            else if (lowerName.includes('inspection')) currentType = "INSPECTION";
-            else if (lowerName.includes('work order') || lowerName.includes('work_order')) currentType = "WORKORDER";
-
-            // Fallback: If filename is ambiguous, check the Subject Line
-            if (currentType === "UNKNOWN") {
-                var lowerSubject = subject.toLowerCase();
-                if (lowerSubject.includes('vacancy')) currentType = "VACANCY";
-                else if (lowerSubject.includes('tickler') || lowerSubject.includes('move out')) currentType = "MOVEOUT";
-                else if (lowerSubject.includes('inspection')) currentType = "INSPECTION";
-                else if (lowerSubject.includes('work order')) currentType = "WORKORDER";
-            }
-
-            // CHECK IF WE SHOULD PROCESS THIS FILE
-            // We want to aggregate ALL relevant files:
-            // - Vacancy: 1 file
-            // - Move Out/Tickler: 2 files (Last 90, Next 90)
-            // - Inspection: 2 files (Last 90, Next 90)
-            // - Work Order: 2 files (Last 90, Next 90)
-            // Total: 7 potential files per daily run.
-            
-            // We will NOT skip if we already found one, because we need both (Last 90 + Next 90).
-            // However, we must be careful not to process the *same* file twice if it appears in multiple threads (e.g. yesterday's email).
-            // Since we are iterating newest to oldest, we could theoretically just grab everything from the newest batch.
-            // But relying on "Newest Thread" is safer if we just process everything found in the Search Window 
-            // and rely on the fact that we increased the search limit to 50 to catch them all.
-            // Better strategy: Just aggregate everything found. Duplicate rows (if any) will overlap but likely not break the board logic 
-            // since we use a Map by Property-Unit to merge data. The latest data will overwrite.
-            
-            if (currentType !== "UNKNOWN") {
-                 // No "foundTypes" check anymore - we want ALL parts (Past & Next)
-                 // Logic: Just process and add.
-            }
-
-            // 3. PARSE CSV CONTENT
-            if (att.getContentType() === 'text/csv' || name.endsWith('.csv')) {
-                var csvString = att.getDataAsString();
-                var rows = this.parseCSV(csvString, debugLog, name);
-                
-                if (rows.length > 0) {
-                    // Fallback Type Check (Columns) if filename failed
-                    if (currentType === "UNKNOWN") {
-                         if(rows[0]['Days Vacant']) currentType = "VACANCY";
-                         else if (rows[0]['Move Out Date']) currentType = "MOVEOUT";
-                    }
-
-                    // Assign Data
-                    if (currentType === "VACANCY") {
-                        rawData.vacancies = rawData.vacancies.concat(rows);
-                        debugLog.push("          -> ADDED: Vacancy Data (" + rows.length + " rows)");
-                    } else if (currentType === "MOVEOUT") {
-                        rawData.moveOuts = rawData.moveOuts.concat(rows);
-                        debugLog.push("          -> ADDED: Move Out Data (" + rows.length + " rows)");
-                    } else if (currentType === "INSPECTION") {
-                        rawData.inspections = rawData.inspections.concat(rows);
-                        debugLog.push("          -> ADDED: Inspection Data (" + rows.length + " rows)");
-                    } else if (currentType === "WORKORDER") {
-                        rawData.workOrders = rawData.workOrders.concat(rows);
-                        debugLog.push("          -> ADDED: Work Order Data (" + rows.length + " rows)");
-                    } else {
-                         debugLog.push("          -> IGNORED: Unknown type.");
-                    }
-                }
-
-            } else {
-                debugLog.push("          -> SKIPPED: Not a CSV (Type: " + att.getContentType() + ", Name: " + name + ")");
-            }
-        }
+          if (file) {
+              debugLog.push(`[${config.type.toUpperCase()}] Found source: ${sourceName}`);
+              var csvString = file.getBlob().getDataAsString();
+              var rows = this.parseCSV(csvString, debugLog, sourceName);
+              
+              if (rows.length > 0) {
+                  rawData[config.target] = rawData[config.target].concat(rows);
+                  debugLog.push(`    -> Loaded ${rows.length} rows.`);
+              } else {
+                  debugLog.push(`    -> WARNING: File was empty or unparseable.`);
+              }
+          } else {
+              debugLog.push(`[${config.type.toUpperCase()}] ERROR: No file found (Checked ${config.core} & ${config.legacy})`);
+          }
       }
-
 
       var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yyyy HH:mm:ss");
       debugLog.push("=== PROCESSING COMPLETE ===");
-      debugLog.push("Final Counts: Vacancies=" + rawData.vacancies.length + ", MoveOuts=" + rawData.moveOuts.length + ", Insp=" + rawData.inspections.length + ", WOs=" + rawData.workOrders.length);
+      
+      // MRB Logic used to reverse chronological order for overlapping email imports. 
+      // Since we are reading single "State of Truth" files now, order usually matters less, 
+      // but AppFolio exports are usually sorted by Unit or Date. 
+      // We will maintain the reverse() just in case the frontend relies on specifically newest-at-bottom behavior, 
+      // though typically "Unit Vacancy" is just a list.
+      // Actually, if it's a list of current vacancies, order doesn't matter.
+      // Move Outs are date based. Reversing might affect queue. keeping it safe.
 
-      // REVERSE DATA ARRAYS
-      // Gmail search returns NEWEST first. We processed them in that order (Newest -> Oldest).
-      // So 'rawData' currently has [NewestData, ..., OldestData].
-      // The Front End iterates through this array 0..length.
-      // If we leave it as is, the Oldest Data (at the end) would overwrite the Newest Data (at the start) in the Front End's Map.
-      // By REVERSING here, we send [OldestData, ..., NewestData].
-      // The Front End will process Oldest first, then Newest. The Newest data will correctly overwrite the Oldest.
       return {
         vacancies: rawData.vacancies.reverse(),
         moveOuts: rawData.moveOuts.reverse(),
@@ -153,7 +85,6 @@ var GmailFetcher = {
 
     } catch (e) {
       debugLog.push("CRITICAL ERROR: " + e.toString());
-      debugLog.push("Stack: " + e.stack);
       return { vacancies: [], moveOuts: [], inspections: [], workOrders: [], timestamp: "Error", debug: debugLog };
     }
   },
@@ -170,17 +101,16 @@ var GmailFetcher = {
         }
 
         // FIND HEADER ROW DYNAMICALLY
-        // FIND HEADER ROW DYNAMICALLY
         var headerRowIndex = -1;
         var headers = [];
 
         for (var i = 0; i < Math.min(table.length, 20); i++) {
             var rowStr = table[i].join(" ").toLowerCase();
             // Look for "Unit" AND "Tags" or "Property" to be sure it's the header
-            if ((rowStr.includes("unit") && rowStr.includes("tags")) || rowStr.includes("property name")) {
+             // Enhanced detection for different report types
+            if ((rowStr.includes("unit") && rowStr.includes("tags")) || rowStr.includes("property name") || rowStr.includes("unit status")) {
                 headerRowIndex = i;
                 headers = table[i];
-                if(debugLog) debugLog.push("          -> DETECTED HEADERS (Row " + i + "): " + JSON.stringify(headers));
                 break;
             }
         }
@@ -188,7 +118,7 @@ var GmailFetcher = {
         if (headerRowIndex === -1) {
             headerRowIndex = 0;
             headers = table[0];
-            if(debugLog) debugLog.push("          -> WARNING: Could not detect standard headers. Using Row 0: " + JSON.stringify(headers));
+            if(debugLog) debugLog.push("          -> WARNING: Could not detect standard headers. Using Row 0.");
         }
 
         // Clean headers
@@ -210,29 +140,14 @@ var GmailFetcher = {
                 }
             }
 
-            // FILTER: SKIP GROUP HEADERS (Start with ->) AND SUMMARIES
-            // In the CSV, Group Headers have empty "Property" fields (cols 19/20).
-            // Data rows have "Property" field populated.
-            // Also, Group Headers usually have the "Unit" column starting with "->".
-            
+            // FILTER: SKIP GROUP HEADERS AND SUMMARIES
             var unitVal = obj['Unit'] || "";
             var propVal = obj['Property'] || obj['Property Name'] || "";
 
-            if (unitVal.trim().startsWith("->")) {
-                 // Skip Group Header
-                 continue;
-            }
-            if (!propVal && !unitVal) {
-                // Skip Empty/Junk Row
-                continue;
-            }
-            // If Property is missing but Unit is present, it might be a valid row with missing data, 
-            // OR it might be a summary row if Unit is "Total".
+            if (unitVal.trim().startsWith("->")) continue; // Skip Group Header
+            if (!propVal && !unitVal) continue; // Skip Empty/Junk Row
             if (unitVal === "Total") continue;
 
-            // If we have a unit but no property, we might need a fallback, but per analysis, Data Rows have Property.
-            // We will include it and let the Frontend filter if needed.
-            
             result.push(obj);
         }
         return result;
