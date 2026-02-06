@@ -246,3 +246,128 @@ Projects **Providing Data TO** Make Ready Board:
 - [ ] Browser console clear of errors
 - [ ] `include()` function exists in Code.gs
 - [ ] `easter_egg.html` file present
+
+## Auto Deep Summary (2026-02-06)
+
+**Project Type:**
+- Google Apps Script: True
+- Node/JS: False
+- Python: False
+- Web Frontend: True
+
+**High-Level Summary:**
+# Make Ready Board | PropAlliance The **Make Ready Board** is a digital dashboard for tracking unit turnover, vacancies, and maintenance statuses. It aggregates data from AppFolio reports and displays it in a Kanban-style view.
+
+**Top-Level Files/Folders:**
+- .clasp.json, .claspignore, .gitignore, BrainSync.gs, BrainSync.js, Code.gs, Code.js, GmailFetcher.gs, GmailFetcher.js, Inspection Detail.csv, Move Out.csv, PROJECT_NOTES.md, README.md, Unit Vacancy.csv, appsscript.json, easter_egg.html, index.html, inspect_workorder.js, simulate_parsing.js, styles.css, tenant_tickler-20260120.csv, work_order-20260120.csv
+
+**Key Files:**
+- README.md, PROJECT_NOTES.md, Code.gs, index.html, appsscript.json
+
+**Detected Data Sources (from README/notes):**
+- AppFolio, CSV, Gmail, Google Drive
+
+**GAS Signals (if applicable):**
+- DriveApp, HtmlService, PropertiesService
+
+**Notes:**
+- This section is auto-generated. Add or correct specifics as needed.
+
+## Ultra Deep Signals (2026-02-06)
+
+**GAS Functions (sample):**
+- doGet, generateKey, getData, include, setHiddenUnits, syncToBrain
+
+**Python Functions (sample):**
+- None detected
+
+**Detected Constants (sample):**
+- None detected
+
+**Detected URLs (sample):**
+- https://script.google.com/d/1Xy.../edit
+https://script.google.com/macros/s/AKfycbyPog4jXWO_ORUfVuILEqsqba_6koEOGIm12Pyi-bfEjgWnKL4pU2Fn5Ef_AGKhJVGy/exec
+
+**Notes:**
+- This section is auto-generated; treat as a signal map, not a full spec.
+
+## Ultra Deep Functions (2026-02-06)
+
+**GAS Functions (with comments if found):**
+- doGet
+- doGet
+- doGet
+- generateKey: 1. Fetch Latest Data
+    const result = GmailFetcher.getLatestReportData();
+    if (!result || !result.vacancies) {
+      throw new Error("F
+- getData
+- getData
+- getData
+- include
+- setHiddenUnits: Enrich with shared hidden list
+    try {
+      var hiddenJSON = PropertiesService.getScriptProperties().getProperty('mrb_hidden_list');
+    
+- setHiddenUnits: Enrich with shared hidden list
+    try {
+      var hiddenJSON = PropertiesService.getScriptProperties().getProperty('mrb_hidden_list');
+    
+- setHiddenUnits: Enrich with shared hidden list
+    try {
+      var hiddenJSON = PropertiesService.getScriptProperties().getProperty('mrb_hidden_list');
+    
+- syncToBrain
+
+**Python Functions (with docstrings if found):**
+- None detected
+
+**HTML Includes (if any):**
+- None detected
+
+**Potential Risks/Flags (auto):**
+- Uses PropertiesService (check keys and size limits)
+
+
+## File Summary
+- See `FILE_SUMMARY.md` for per-file notes.
+
+
+## Runtime Flow
+- See `RUNTIME_FLOW.md` for flow and inputs.
+
+
+## Risks
+- See `RISKS.md` for risk flags.
+
+
+## Data Contract
+- See `DATA_CONTRACT.md` for CSV schema headers.
+
+
+## Function Map
+- See `FUNCTION_MAP.md` for per-file functions.
+
+
+## Failure Playbook
+- See `FAILURE_PLAYBOOK.md` for common breakages.
+
+
+## Security Review
+- See `SECURITY_REVIEW.md` for risk flags.
+
+
+## Operational Timeline
+- See `OPERATIONAL_TIMELINE.md` for trigger and refresh hints.
+
+
+## Test Checklist
+- See `TEST_CHECKLIST.md` for smoke test steps.
+
+
+## Business Logic Map
+- See `BUSINESS_LOGIC_MAP.md` for metric-to-data mapping.
+
+
+## Runbook
+- See `RUNBOOK.md` for ops/recovery steps.
