@@ -5,6 +5,10 @@ function doGet() {
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
 function getData() {
   try {
     var data = GmailFetcher.getLatestReportData();
