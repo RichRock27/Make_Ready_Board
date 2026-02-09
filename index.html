@@ -1308,6 +1308,68 @@
 
     <?!= include('easter_egg'); ?>
 
+
+<style>
+#sheet-link-btn{position:fixed;top:12px;right:12px;z-index:9999;background:#0ea5e9;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-weight:600;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,0.2);}
+#sheet-link-btn:hover{background:#0284c7;}
+</style>
+<script>
+function openSheetFromApp(){
+  if (!google || !google.script || !google.script.run) { alert('Sheet link unavailable'); return; }
+  google.script.run
+    .withSuccessHandler(cfg => {
+      if (!cfg || !cfg.url) {
+        const url = prompt('Paste the Google Sheet URL for this app:');
+        if (!url) return;
+        google.script.run
+          .withSuccessHandler(res => {
+            if (res && res.config && res.config.url) window.open(res.config.url, '_blank');
+          })
+          .withFailureHandler(err => alert('Failed to set sheet: ' + err.message))
+          .setSheetUrl(url);
+        return;
+      }
+      window.open(cfg.url, '_blank');
+    })
+    .withFailureHandler(err => alert('Failed to load sheet link: ' + err.message))
+    .getSheetConfig();
+}
+</script>
+<button id="sheet-link-btn" onclick="openSheetFromApp()">Open Sheet</button>
+
+
+<style>
+#sheet-link-btn{position:fixed;top:12px;right:12px;z-index:9999;background:#0ea5e9;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-weight:600;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,0.2);} 
+#sheet-link-btn:hover{background:#0284c7;}
+#sheet-info-btn{position:fixed;top:52px;right:12px;z-index:9999;background:#1f2937;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-weight:600;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,0.2);} 
+#sheet-info-btn:hover{background:#111827;}
+</style>
+<script>
+function openSheetFromApp(){
+  if (!google || !google.script || !google.script.run) { alert('Sheet link unavailable'); return; }
+  google.script.run
+    .withSuccessHandler(cfg => {
+      if (!cfg || !cfg.url) { alert('No sheet configured for this app.'); return; }
+      window.open(cfg.url, '_blank');
+    })
+    .withFailureHandler(err => alert('Failed to load sheet link: ' + err.message))
+    .getSheetConfig();
+}
+function showSheetInfo(){
+  if (!google || !google.script || !google.script.run) { alert('Sheet info unavailable'); return; }
+  google.script.run
+    .withSuccessHandler(cfg => {
+      if (!cfg || !cfg.url) { alert('No sheet configured for this app.'); return; }
+      alert('Sheet: ' + (cfg.name || 'Unnamed') + '
+' + cfg.url);
+    })
+    .withFailureHandler(err => alert('Failed to load sheet info: ' + err.message))
+    .getSheetConfig();
+}
+</script>
+<button id="sheet-link-btn" onclick="openSheetFromApp()">Open Sheet</button>
+<button id="sheet-info-btn" onclick="showSheetInfo()">Sheet Info</button>
+
 </body>
 
 </html>

@@ -44,3 +44,14 @@ function setHiddenUnits(hiddenArray) {
      return { status: 'error', message: e.toString() };
   }
 }
+
+function getSheetConfig() {
+  try {
+    const folderId = '13f-KJPJ5mzHkrE5_JU16dc62gv3WEzQN';
+    if (!folderId) return { url: null, name: null };
+    const folder = DriveApp.getFolderById(folderId);
+    return { url: folder.getUrl(), name: folder.getName() + ' (Data Folder)' };
+  } catch (e) {
+    return { url: null, name: null };
+  }
+}

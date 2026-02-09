@@ -3,3 +3,5 @@ _BACKUPS/**
 README.md
 **/*.csv
 *.js
+
+*.js
